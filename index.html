@@ -393,8 +393,44 @@ a{text-decoration:none}
         <input class="inp" id="log-dur" placeholder="e.g. 42 days">
       </div>
       <div id="log-harvest-fields" style="display:none">
-        <label class="lbl">Amount (lbs)</label>
-        <input type="number" class="inp" id="log-lbs" placeholder="0.0">
+        <label class="lbl">Frames Taken</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <button type="button" onclick="adjFrames(-1)" style="width:44px;height:44px;border-radius:10px;border:2px solid #c8bc98;background:#eee9db;font-size:22px;cursor:pointer;font-family:sans-serif">−</button>
+          <div id="log-frames-display" style="flex:1;text-align:center;font-size:24px;font-weight:800;font-family:sans-serif;color:#1a2e1a">0</div>
+          <button type="button" onclick="adjFrames(1)" style="width:44px;height:44px;border-radius:10px;border:2px solid #c8bc98;background:#eee9db;font-size:22px;cursor:pointer;font-family:sans-serif">+</button>
+          <input type="hidden" id="log-frames" value="0">
+        </div>
+        <div id="log-frames-calc" style="background:#d4e8d0;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-family:sans-serif;font-size:14px;color:#2d4a2d;display:none">
+          <div id="log-frames-lbs"></div>
+          <div id="log-frames-jars"></div>
+        </div>
+        <label class="lbl">Box Type</label>
+        <select class="sel" id="log-box-type">
+          <option value="super">Honey super</option>
+          <option value="comb">Comb honey box</option>
+          <option value="medium">Medium super</option>
+          <option value="deep">Deep box</option>
+        </select>
+        <label class="lbl">Frame Type</label>
+        <select class="sel" id="log-frame-type">
+          <option value="drawn">Built comb (drawn)</option>
+          <option value="foundation">Foundation</option>
+          <option value="empty">Empty frame</option>
+        </select>
+        <label class="lbl">Estimated Weight (lbs)</label>
+        <input type="number" class="inp" id="log-lbs" placeholder="Auto-calculated or enter manually">
+        <label class="lbl">Jars Returned to Host</label>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input type="number" class="inp" style="flex:1" id="log-jars" placeholder="# jars">
+          <select class="sel" style="flex:1" id="log-jar-size">
+            <option value="8.8oz">8.8 oz</option>
+            <option value="12oz">12 oz</option>
+            <option value="16oz">16 oz</option>
+            <option value="1lb">1 lb</option>
+          </select>
+        </div>
+        <label class="lbl">Date Jars Delivered</label>
+        <input type="date" class="inp" id="log-jars-date">
       </div>
       <div id="log-install-fields" style="display:none">
         <label class="lbl">Breed</label>
@@ -2549,31 +2585,94 @@ function updateLogFields(){
   else if(logType==="install"){document.getElementById("log-install-fields").style.display="block";}
   else if(logType==="swarm"){document.getElementById("log-swarm-fields").style.display="block";}
 }
-let logQ=null,logStr="",logBrd="";
+let logQ=null,logEggs=null,logQCells=null,logStr="",logBrd="";
 function renderInspFields(){
   const f=document.getElementById("log-insp-fields");
   if(!f)return;
-  let html='<label class="lbl">Queen</label><div style="display:flex;gap:8px">';
-  [{v:true,l:"✓ Seen"},{v:false,l:"✗ Not Seen"},{v:null,l:"Unknown"}].forEach(function(q){
-    const sel=logQ===q.v;
-    html+='<button onclick="setLogQ('+(q.v===null?"null":q.v)+')" style="flex:1;padding:12px 6px;border:2px solid #3a7d44;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?"#3a7d44":"#eee9db")+';color:'+(sel?"#fff":"#3a7d44")+'">'+q.l+'</button>';
-  });
-  html+='</div><label class="lbl">Strength</label><div style="display:flex;gap:7px;flex-wrap:wrap">';
-  ["Strong","Medium","Weak","Very Weak"].forEach(function(s){
-    const sel=logStr===s;
-    html+='<button onclick="setLogStr(\''+s+'\')" style="padding:9px 14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?"#3a7d44":"#eee9db")+';border:2px solid rgba(58,125,68,.5);color:'+(sel?"#fff":"#4a6040")+'">'+s+'</button>';
-  });
-  html+='</div><label class="lbl">Brood</label><div style="display:flex;gap:7px;flex-wrap:wrap">';
-  ["Solid","Spotty","Minimal","None"].forEach(function(b){
-    const sel=logBrd===b;
-    html+='<button onclick="setLogBrd(\''+b+'\')" style="padding:9px 14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?"#2060a0":"#eee9db")+';border:2px solid rgba(32,96,160,.5);color:'+(sel?"#fff":"#4a6040")+'">'+b+'</button>';
+  // Queen seen / Eggs seen / Queen cells seen
+  let html='<div style="background:#f5f1e8;border-radius:12px;padding:12px;margin-bottom:10px">';
+  html+='<div style="font-size:13px;font-weight:700;color:#4a6040;font-family:sans-serif;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Queen Status</div>';
+  // Row for each toggle
+  [
+    {id:"logQ",val:logQ,label:"👑 Queen seen",set:"setLogQ"},
+    {id:"logEggs",val:logEggs,label:"🥚 Eggs seen",set:"setLogEggs"},
+    {id:"logQCells",val:logQCells,label:"🔶 Queen cells",set:"setLogQCells"}
+  ].forEach(function(row){
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    html+='<span style="font-size:15px;font-family:sans-serif;color:#1a2e1a">'+row.label+'</span>';
+    html+='<div style="display:flex;gap:6px">';
+    [{v:"true",l:"✓ Yes"},{v:"false",l:"✗ No"},{v:"null",l:"?"}].forEach(function(btn){
+      const sel=String(row.val)===btn.v||(btn.v==="null"&&row.val===null);
+      const col=btn.v==="true"?"#3a7d44":btn.v==="false"?"#b83030":"#8a9e80";
+      html+='<button onclick="'+row.set+'('+btn.v+')" style="padding:7px 12px;border:2px solid '+col+';border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?col:"#fff")+';color:'+(sel?"#fff":col)+'">'+btn.l+'</button>';
+    });
+    html+='</div></div>';
   });
   html+='</div>';
+
+  // Colony strength
+  html+='<label class="lbl">Colony Strength</label><div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">';
+  ["Strong","Medium","Weak","Very Weak"].forEach(function(s){
+    const sel=logStr===s;
+    const col=s==="Strong"?"#3a7d44":s==="Medium"?"#b87820":s==="Weak"?"#b83030":"#8a3030";
+    html+='<button onclick="setLogStr(\''+s+'\')" style="padding:9px 14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?col:"#eee9db")+';border:2px solid '+col+';color:'+(sel?"#fff":"#4a6040")+'">'+s+'</button>';
+  });
+  html+='</div>';
+
+  // Brood pattern
+  html+='<label class="lbl">Brood Pattern</label><div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">';
+  ["Excellent","Good","Fair","Poor","None"].forEach(function(b){
+    const sel=logBrd===b;
+    const col=b==="Excellent"||b==="Good"?"#3a7d44":b==="Fair"?"#b87820":"#b83030";
+    html+='<button onclick="setLogBrd(\''+b+'\')" style="padding:9px 14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?col:"#eee9db")+';border:2px solid '+col+';color:'+(sel?"#fff":"#4a6040")+'">'+b+'</button>';
+  });
+  html+='</div>';
+
+  // Boxes/frames added
+  html+='<label class="lbl">Boxes / Frames Added or Removed</label>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  [["log-boxes-added","Boxes added"],["log-frames-added","Frames added"]].forEach(function(r){
+    html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">'+r[1]+'</div>';
+    html+='<input type="number" id="'+r[0]+'" class="inp" style="margin:0;text-align:center" placeholder="0" min="-10" max="20"></div>';
+  });
+  html+='</div>';
+
+  // Problems
+  html+='<label class="lbl">Problems</label>';
+  html+='<input class="inp" id="log-problems" placeholder="e.g. Varroa mites, chalkbrood, small hive beetles…">';
+
   f.innerHTML=html;
 }
-function setLogQ(v){logQ=v===null?null:(v==="true"||v===true);renderInspFields();}
+function setLogQ(v){logQ=v==="null"||v===null?null:(v==="true"||v===true);renderInspFields();}
+function setLogEggs(v){logEggs=v==="null"||v===null?null:(v==="true"||v===true);renderInspFields();}
+function setLogQCells(v){logQCells=v==="null"||v===null?null:(v==="true"||v===true);renderInspFields();}
 function setLogStr(s){logStr=s;renderInspFields();}
 function setLogBrd(b){logBrd=b;renderInspFields();}
+
+// Harvest frame counter
+let logFrames=0;
+function adjFrames(delta){
+  logFrames=Math.max(0,logFrames+delta);
+  document.getElementById("log-frames").value=logFrames;
+  document.getElementById("log-frames-display").textContent=logFrames;
+  const lbsEst=Math.round(logFrames*5.5*10)/10;
+  document.getElementById("log-lbs").value=logFrames>0?lbsEst:"";
+  // Jar calculation — get hive count at selected apiary
+  const apId=document.getElementById("log-ap").value;
+  const hvId=document.getElementById("log-hv").value;
+  const calc=document.getElementById("log-frames-calc");
+  if(logFrames>0){
+    calc.style.display="block";
+    document.getElementById("log-frames-lbs").textContent="🍯 Est. "+lbsEst+" lbs ("+logFrames+" frames × 5.5 lbs avg)";
+    // Jar estimate: 1 hive=48 jars, each additional=36 jars
+    const hiveCount=hvId?1:DB.hv.filter(function(h){return h.ap===apId&&(h.status||"active")==="active";}).length;
+    const jars=hiveCount<=1?48:48+((hiveCount-1)*36);
+    document.getElementById("log-frames-jars").textContent="🫙 Est. "+jars+" jars of 8.8oz to return to host";
+    document.getElementById("log-jars").value=jars;
+  } else {
+    calc.style.display="none";
+  }
+}
 function logApChanged(){
   const apId=document.getElementById("log-ap").value;
   const hvSel=document.getElementById("log-hv");
@@ -2588,10 +2687,37 @@ async function saveLog(){
   const notes=document.getElementById("log-notes").value;
   const followup=document.getElementById("log-followup").value;
   const ev={id:uid(),ap:apId,hv:hvId||null,date:date,notes:notes,type:logType};
-  if(logType==="inspection"){ev.queen_seen=logQ;ev.str=logStr;ev.brood=logBrd;}
+  if(logType==="inspection"){
+    ev.queen_seen=logQ;ev.str=logStr;ev.brood=logBrd;
+    ev.eggs_seen=logEggs;
+    ev.queen_cells=logQCells;
+    ev.boxes_added=document.getElementById("log-boxes-added")?document.getElementById("log-boxes-added").value||null:null;
+    ev.frames_added=document.getElementById("log-frames-added")?document.getElementById("log-frames-added").value||null:null;
+    ev.problems=document.getElementById("log-problems")?document.getElementById("log-problems").value||null:null;
+    // Add problems to notes if filled
+    const prob=ev.problems;
+    if(prob&&!ev.notes)ev.notes=prob;
+    else if(prob&&ev.notes)ev.notes=ev.notes+" | Problems: "+prob;
+  }
   else if(logType==="feeding"){ev.feed_type=document.getElementById("log-feed-type").value;ev.amt=document.getElementById("log-amt").value;}
   else if(logType==="treatment"){ev.treat_type=document.getElementById("log-treat-type").value;ev.dur=document.getElementById("log-dur").value;}
-  else if(logType==="harvest"){ev.lbs=document.getElementById("log-lbs").value;}
+  else if(logType==="harvest"){
+    ev.frames=parseInt(document.getElementById("log-frames").value)||0;
+    ev.lbs=document.getElementById("log-lbs").value;
+    ev.box_type=document.getElementById("log-box-type").value;
+    ev.frame_type=document.getElementById("log-frame-type").value;
+    ev.jars=document.getElementById("log-jars").value;
+    ev.jar_size=document.getElementById("log-jar-size").value;
+    ev.jars_date=document.getElementById("log-jars-date").value;
+    // Build notes summary
+    const parts=[];
+    if(ev.frames)parts.push(ev.frames+" frames taken");
+    if(ev.box_type)parts.push(ev.box_type);
+    if(ev.frame_type)parts.push(ev.frame_type);
+    if(ev.jars)parts.push(ev.jars+" jars ("+ev.jar_size+") returned");
+    if(ev.jars_date)parts.push("delivered "+fmtD(ev.jars_date));
+    if(parts.length&&!ev.notes)ev.notes=parts.join(" · ");
+  }
   else if(logType==="install"){ev.breed=document.getElementById("log-breed").value;ev.source=document.getElementById("log-source").value;}
   else if(logType==="swarm"){
     ev.swarm_type=document.getElementById("log-swarm-type").value;
@@ -2682,11 +2808,11 @@ async function saveLog(){
     const autoMsg=matchingTasks.length===1
       ?"✓ Logged + 1 task auto-completed"
       :"✓ Logged + "+matchingTasks.length+" tasks auto-completed";
-    logQ=null;logStr="";logBrd="";
+    logQ=null;logEggs=null;logQCells=null;logStr="";logBrd="";logFrames=0;
     closeModal("log-modal");
     toast$(autoMsg);
   } else {
-    logQ=null;logStr="";logBrd="";
+    logQ=null;logEggs=null;logQCells=null;logStr="";logBrd="";logFrames=0;
     closeModal("log-modal");
     toast$("Logged ✓");
   }
