@@ -2317,33 +2317,17 @@ function renderReports(){
     html+='<div class="sec" style="margin-top:12px">🔎 Hive Finder</div>';
     html+='<div class="card" style="margin-bottom:10px">';
     html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-bottom:10px">Find all hives matching a condition:</div>';
-    // Hive Finder — use string keys to avoid 0=falsy bug
-    const queries={
-      comb_super:{l:"🍯 Comb honey super",fn:function(){return DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});});}},
-      pollen_trap:{l:"🌼 Pollen trap",fn:function(){return DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="pollen_trap";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});}},
-      queen_excluder:{l:"👑 Queen excluder",fn:function(){return DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="queen_excluder";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});}},
-      three_boxes:{l:"📦 3+ boxes",fn:function(){return DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});const tot=2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);return tot>=3;});}},
-      queen_cells:{l:"🔶 Queen cells",fn:function(){return DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});}},
-      strong:{l:"💪 Strong",fn:function(){return DB.hv.filter(function(h){return h.str==="Strong";});}},
-    };
-    const activeQ=window._hiveFinder||"";
-    html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-    Object.keys(queries).forEach(function(k){
+    const finderKeys=["comb_super","pollen_trap","queen_excluder","three_boxes","queen_cells","strong"];
+    const finderLabels={comb_super:"🍯 Comb honey super",pollen_trap:"🌼 Pollen trap",queen_excluder:"👑 Queen excluder",three_boxes:"📦 3+ boxes",queen_cells:"🔶 Queen cells",strong:"💪 Strong"};
+    const activeQ=window._hiveFinderKey||"";
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+    finderKeys.forEach(function(k){
       const isActive=activeQ===k;
-      html+='<button onclick="window._hiveFinder=\''+(isActive?"":k)+'\';renderReports()" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(isActive?"#3a7d44":"#eee9db")+';color:'+(isActive?"#fff":"#3a7d44")+'">'+queries[k].l+'</button>';
+      html+='<button onclick="runHiveFinder(\''+k+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(isActive?"#3a7d44":"#eee9db")+';color:'+(isActive?"#fff":"#3a7d44")+'">'+finderLabels[k]+'</button>';
     });
     html+='</div>';
-    if(activeQ&&queries[activeQ]){
-      const results=queries[activeQ].fn();
-      html+='<div style="margin-top:12px;font-size:14px;font-weight:700;color:#2d4a2d">'+results.length+' hive'+(results.length!==1?"s":"")+" match:</div>";
-      if(results.length===0){html+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif;margin-top:4px">None found</div>';}
-      results.forEach(function(h){
-        const ap=getAp(h.ap);
-        html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')">';
-        html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
-        html+='<div style="font-size:13px;color:#3a7d44;font-weight:700">Open →</div>';
-        html+='</div>';
-      });
+    if(activeQ){
+      html+='<div id="hive-finder-results"></div>';
     }
     html+='</div>';
 
@@ -2711,7 +2695,33 @@ async function deleteEvent(id){
 }
 
 function setSelHvById(id){selHv=getHv(id);}
-function setRepTab(t){repTab=t;renderReports();}
+function runHiveFinder(key){
+  window._hiveFinderKey=window._hiveFinderKey===key?"":key;
+  // Re-render the reports page
+  renderReports();
+  // Then populate results div if active
+  if(!window._hiveFinderKey)return;
+  const k=window._hiveFinderKey;
+  let results=[];
+  if(k==="comb_super")results=DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});});
+  else if(k==="pollen_trap")results=DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="pollen_trap";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});
+  else if(k==="queen_excluder")results=DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="queen_excluder";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});
+  else if(k==="three_boxes")results=DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});return 2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0)>=3;});
+  else if(k==="queen_cells")results=DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});
+  else if(k==="strong")results=DB.hv.filter(function(h){return h.str==="Strong";});
+  const el=document.getElementById("hive-finder-results");
+  if(!el)return;
+  let html='<div style="font-size:14px;font-weight:700;color:#2d4a2d;margin-bottom:6px">'+results.length+' hive'+(results.length!==1?"s":"")+" found</div>";
+  if(results.length===0){html+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif">None found</div>';}
+  results.forEach(function(h){
+    const ap=getAp(h.ap);
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')">';
+    html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
+    html+='<span style="font-size:13px;color:#3a7d44;font-weight:700">Open →</span>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
 function scCard(icon,val,label,color){
   return'<div class="sc-card"><div style="font-size:22px">'+icon+'</div><div style="font-size:28px;font-weight:800;color:'+color+';font-family:sans-serif">'+val+'</div><div style="font-size:11px;color:#4a6040;font-family:sans-serif;text-transform:uppercase;letter-spacing:.07em;margin-top:2px">'+label+'</div></div>';
 }
