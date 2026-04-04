@@ -2225,9 +2225,9 @@ function renderReports(){
     html+='<div class="sc-card" onclick="window._healthSub=\'strong\';renderReports()" style="cursor:pointer;'+(healthSubTab==="strong"?"border:2px solid #3a7d44;":"")+'"><div style="font-size:22px">💪</div><div style="font-size:28px;font-weight:800;color:#3a7d44;font-family:sans-serif">'+strong.length+'</div><div style="font-size:11px;color:#4a6040;font-family:sans-serif;text-transform:uppercase">Strong ↗</div></div>';
     html+='</div>';
 
-    function renderHiveList(hvs, borderColor){
+    var renderHiveList=function(hvs, borderColor){
       if(hvs.length===0)return'<div class="card" style="text-align:center;font-family:sans-serif;color:#3a7d44">None ✓</div>';
-      let h="";
+      var h="";
       hvs.forEach(function(hv){
         const ap=getAp(hv.ap);
         const li=lastEv(hv.id,"inspection");
@@ -2241,7 +2241,7 @@ function renderReports(){
         h+='</div></div>';
       });
       return h;
-    }
+    };
 
     if(healthSubTab==="issues"){
       html+='<div class="sec">Queen Issues ('+qi.length+')</div>';
@@ -2317,12 +2317,12 @@ function renderReports(){
     html+='<div class="sec" style="margin-top:12px">🔎 Hive Finder</div>';
     html+='<div class="card" style="margin-bottom:10px">';
     html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-bottom:10px">Find all hives matching a condition:</div>';
-    const finderKeys=["comb_super","pollen_trap","queen_excluder","three_boxes","queen_cells","strong"];
-    const finderLabels={comb_super:"🍯 Comb honey super",pollen_trap:"🌼 Pollen trap",queen_excluder:"👑 Queen excluder",three_boxes:"📦 3+ boxes",queen_cells:"🔶 Queen cells",strong:"💪 Strong"};
-    const activeQ=window._hiveFinderKey||"";
+    var finderKeys=["comb_super","pollen_trap","queen_excluder","three_boxes","queen_cells","strong"];
+    var finderLabels={comb_super:"🍯 Comb honey super",pollen_trap:"🌼 Pollen trap",queen_excluder:"👑 Queen excluder",three_boxes:"📦 3+ boxes",queen_cells:"🔶 Queen cells",strong:"💪 Strong"};
+    var activeQ=window._hiveFinderKey||"";
     html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
     finderKeys.forEach(function(k){
-      const isActive=activeQ===k;
+      var isActive=activeQ===k;
       html+='<button onclick="runHiveFinder(\''+k+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(isActive?"#3a7d44":"#eee9db")+';color:'+(isActive?"#fff":"#3a7d44")+'">'+finderLabels[k]+'</button>';
     });
     html+='</div>';
