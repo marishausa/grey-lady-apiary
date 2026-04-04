@@ -599,6 +599,7 @@ const SB = {
       queen_seen: ev.queen_seen !== undefined ? ev.queen_seen : null,
       eggs_seen: ev.eggs_seen !== undefined ? ev.eggs_seen : null,
       queen_cells: ev.queen_cells !== undefined ? ev.queen_cells : null,
+      capped_brood: ev.capped_brood !== undefined ? ev.capped_brood : null,
       strength: ev.str || null, brood: ev.brood || null,
       boxes_added: ev.boxes_added ? parseInt(ev.boxes_added) : null,
       frames_added: ev.frames_added ? parseInt(ev.frames_added) : null,
@@ -659,6 +660,10 @@ const SB = {
     if (fields.hive_status !== undefined)      mapped.hive_status      = fields.hive_status;
     if (fields.winter_survived !== undefined)  mapped.winter_survived  = fields.winter_survived;
     if (fields.winter_year !== undefined)      mapped.winter_year      = fields.winter_year;
+    if (fields.box_count !== undefined)        mapped.box_count        = fields.box_count;
+    if (fields.box_types !== undefined)        mapped.box_types        = fields.box_types;
+    if (fields.bottom_board !== undefined)     mapped.bottom_board     = fields.bottom_board;
+    if (fields.feeder !== undefined)           mapped.feeder           = fields.feeder;
     const {error} = await supa.from('hives').update(mapped).eq('id', id);
     if (error) console.error('updateHive error:', error);
     return !error;
@@ -788,8 +793,8 @@ let DB = {ap:[], hv:[], ev:[], tk:[], tr:[]};
 
 // Map Supabase column names → app field names
 function mapAp(row){return{id:row.id,addr:row.addr,contact:row.contact,hives:row.hives,lat:row.lat,lng:row.lng,phone:row.phone||'',notes:row.notes||''};}
-function mapHv(row){return{id:row.id,ap:row.apiary_id,n:row.num,breed:row.breed,queen:row.queen||'Unknown',str:row.strength||'Medium',risk:row.risk,notes:row.notes||'',status:row.hive_status||'active',winter_survived:row.winter_survived===null||row.winter_survived===undefined?null:row.winter_survived,winter_year:row.winter_year||null};}
-function mapEv(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:row.date,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,equip_type:row.equip_type,equip_action:row.equip_action};}
+function mapHv(row){return{id:row.id,ap:row.apiary_id,n:row.num,breed:row.breed,queen:row.queen||'Unknown',str:row.strength||'Medium',risk:row.risk,notes:row.notes||'',status:row.hive_status||'active',winter_survived:row.winter_survived===null||row.winter_survived===undefined?null:row.winter_survived,winter_year:row.winter_year||null,box_count:row.box_count||null,box_types:row.box_types||null,bottom_board:row.bottom_board||null,feeder:row.feeder||null};}
+function mapEv(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:row.date,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,capped_brood:row.capped_brood,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,equip_type:row.equip_type,equip_action:row.equip_action};}
 
 function mapTk(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,ttype:row.task_type,notes:row.notes,due:row.due_date,status:row.status,ts:row.created_at};}
 
@@ -1000,6 +1005,7 @@ function eventRowHTML(ev,showAddr){
     if(ev.queen_seen===true)pills+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">👑 Queen ✓</span>';
     else if(ev.queen_seen===false)pills+='<span class="pill" style="background:#b8303020;border:1.5px solid #b8303050;color:#b83030">👑 No queen</span>';
     if(ev.eggs_seen===true)pills+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">🥚 Eggs ✓</span>';
+    if(ev.capped_brood===true)pills+='<span class="pill" style="background:#3a7d4420;border:1.5px solid #3a7d4450;color:#3a7d44">🍬 Capped brood ✓</span>';
     if(ev.queen_cells===true)pills+='<span class="pill" style="background:#b8303020;border:1.5px solid #b8303050;color:#b83030">🔶 QC found</span>';
     if(ev.str)pills+='<span class="pill" style="background:#3a7d4420;border:1.5px solid #3a7d4450;color:#3a7d44">'+ev.str+'</span>';
     if(ev.brood)pills+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+ev.brood+' brood</span>';
@@ -1206,68 +1212,59 @@ function renderHive(){
     body+='</div>';
   }
 
-  // ── HIVE SUMMARY CARD ────────────────────────────────────────────────────
-  // Calculate boxes from inspection logs - track by type
-  const boxEvents=evts.filter(function(e){return e.type==="inspection"&&e.boxes_added&&e.boxes_added!=0;});
-  const baseBoxes=(h.status||"active")==="active"?2:0;
-  const totalBoxesAdded=boxEvents.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);
-  const boxCount=baseBoxes+totalBoxesAdded;
-  const combSuperAdded=boxEvents.some(function(e){return parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});
-  // Equipment from events
-  const equipEvts=evts.filter(function(e){return e.type==="equipment";});
-  const activeEquip=equipEvts.filter(function(e){return e.equip_action==="installed";}).map(function(e){return e.equip_type;});
-  const removedEquip=equipEvts.filter(function(e){return e.equip_action==="removed";}).map(function(e){return e.equip_type;});
-  const currentEquip=[...new Set(activeEquip.filter(function(eq){return!removedEquip.includes(eq);}))];
+  // ── EQUIPMENT CARD ───────────────────────────────────────────────────────
+  const boxCount=h.box_count||2;
+  const boxTypes=h.box_types||"medium";
+  const bottomBoard=h.bottom_board||null;
+  const feeder=h.feeder||null;
 
   body+='<div class="card" style="margin-bottom:14px;background:#f0f7f0;border-left:4px solid #3a7d44">';
-  body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d;margin-bottom:10px">📊 Hive Summary</div>';
-  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:sans-serif">';
-  // Last inspection
-  if(li){
-    body+='<div style="background:#fff;border-radius:8px;padding:8px">';
-    body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Last Inspection</div>';
-    body+='<div style="font-size:14px;font-weight:700;color:#1a2e1a">'+fmtD(li.date)+'</div>';
-    if(li.str)body+='<div style="font-size:12px;color:#3a7d44;font-weight:600">'+li.str+'</div>';
-    if(li.brood)body+='<div style="font-size:12px;color:#4a6040">'+li.brood+' brood</div>';
-    body+='</div>';
-  } else {
-    body+='<div style="background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Inspection</div><div style="font-size:14px;color:#b83030;font-weight:700">Never</div></div>';
-  }
-  // Box count with type breakdown
-  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
-  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Boxes</div>';
-  body+='<div style="font-size:24px;font-weight:800;color:#2d4a2d">'+boxCount+'</div>';
-  body+='<div style="font-size:11px;color:#4a6040">';
-  if(combSuperAdded)body+='🍯 Comb super ✓';
-  else body+='medium';
+  body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d;margin-bottom:12px">🪵 Hive Setup</div>';
+  // Box count
+  body+='<div style="margin-bottom:12px">';
+  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Boxes</div>';
+  body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(boxCount-1)+')" style="width:40px;height:40px;border-radius:10px;border:2px solid #c8bc98;background:#fff;font-size:22px;cursor:pointer;font-family:sans-serif">−</button>';
+  body+='<div style="font-size:28px;font-weight:800;color:#2d4a2d;min-width:40px;text-align:center">'+boxCount+'</div>';
+  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(boxCount+1)+')" style="width:40px;height:40px;border-radius:10px;border:2px solid #c8bc98;background:#fff;font-size:22px;cursor:pointer;font-family:sans-serif">+</button>';
+  body+='</div>';
+  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  [{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter box"},{v:"medium+comb",l:"Medium + Comb super"},{v:"mixed",l:"Mixed"}].forEach(function(bt){
+    const sel=boxTypes===bt.v;
+    body+='<button onclick="setHvBoxTypes(\''+h.id+'\',\''+bt.v+'\')" style="padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(sel?"#3a7d44":"#fff")+';color:'+(sel?"#fff":"#3a7d44")+'">'+bt.l+'</button>';
+  });
   body+='</div></div>';
-  // Queen
-  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
-  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Queen</div>';
-  if(li&&li.queen_seen===true)body+='<div style="font-size:14px;font-weight:700;color:#3a7d44">👑 Seen</div>';
-  else if(li&&li.queen_seen===false)body+='<div style="font-size:14px;font-weight:700;color:#b83030">👑 Not seen</div>';
-  else if(h.queen&&h.queen!=="Unknown")body+='<div style="font-size:14px;font-weight:700;color:#b87820">'+h.queen+'</div>';
-  else body+='<div style="font-size:14px;color:#8a9e80">Unknown</div>';
-  if(li&&li.eggs_seen===true)body+='<div style="font-size:12px;color:#3a7d44">🥚 Eggs ✓</div>';
-  if(li&&li.queen_cells===true)body+='<div style="font-size:12px;color:#b83030">🔶 Queen cells!</div>';
-  body+='</div>';
-  // Last fed
-  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
-  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Fed</div>';
-  if(lf)body+='<div style="font-size:14px;font-weight:700;color:#b87820">'+dAgo(lf.date)+'</div><div style="font-size:12px;color:#4a6040">'+fmtD(lf.date)+'</div>';
-  else body+='<div style="font-size:14px;color:#b83030;font-weight:700">Never</div>';
-  body+='</div>';
-  body+='</div>';
-  // Equipment badges
-  if(currentEquip.length>0||combSuperAdded){
-    body+='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">';
-    if(combSuperAdded)body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">🍯 Comb honey super</span>';
-    const equipIcons={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder"};
-    currentEquip.forEach(function(eq){
-      body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(equipIcons[eq]||eq)+'</span>';
-    });
-    body+='</div>';
-  }
+  // Bottom board
+  body+='<div style="margin-bottom:12px">';
+  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Bottom Board</div>';
+  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  [{v:"solid",l:"🪵 Solid"},{v:"screened",l:"🔲 Screened"},{v:"pollen",l:"🌼 Pollen trap board"}].forEach(function(bb){
+    const sel=bottomBoard===bb.v;
+    body+='<button onclick="setHvField(\''+h.id+'\',\'bottom_board\',\''+bb.v+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #b87820;background:'+(sel?"#b87820":"#fff")+';color:'+(sel?"#fff":"#b87820")+'">'+bb.l+'</button>';
+  });
+  if(bottomBoard)body+='<button onclick="setHvField(\''+h.id+'\',\'bottom_board\',null)" style="padding:8px 12px;border-radius:10px;font-size:12px;cursor:pointer;font-family:sans-serif;border:2px solid #c8bc98;background:#fff;color:#8a9e80">Clear</button>';
+  body+='</div></div>';
+  // Feeder
+  body+='<div style="margin-bottom:10px">';
+  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Feeder</div>';
+  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  [{v:"inner",l:"🍯 Inner"},{v:"top",l:"🍯 Top"},{v:"yellow_top",l:"🟡 Yellow top"},{v:"none",l:"None"}].forEach(function(f){
+    const sel=feeder===f.v;
+    body+='<button onclick="setHvField(\''+h.id+'\',\'feeder\',\''+f.v+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #2060a0;background:'+(sel?"#2060a0":"#fff")+';color:'+(sel?"#fff":"#2060a0")+'">'+f.l+'</button>';
+  });
+  body+='</div></div>';
+  // Summary badges
+  body+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #c8bc98">';
+  body+='<span class="pill" style="background:#3a7d4420;border:1.5px solid #3a7d4450;color:#2d4a2d;font-weight:800">📦 '+boxCount+' '+(boxTypes||"medium")+'</span>';
+  if(bottomBoard){const bbL={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen board"};body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">'+(bbL[bottomBoard]||bottomBoard)+'</span>';}
+  if(feeder&&feeder!=="none"){const fL={inner:"🍯 Inner feeder",top:"🍯 Top feeder",yellow_top:"🟡 Yellow top feeder"};body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(fL[feeder]||feeder)+'</span>';}
+  body+='</div></div>';
+
+  // ── QUICK STATS ───────────────────────────────────────────────────────────
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">';
+  [[li,"🔍","Inspect","#3a7d44"],[lf,"🍯","Feed","#b87820"],[lt,"💊","Treat","#2060a0"]].forEach(function(row){
+    body+='<div class="sc-card"><div style="font-size:18px">'+row[1]+'</div><div style="font-size:13px;font-weight:700;color:'+row[3]+';font-family:sans-serif">'+(row[0]?dAgo(row[0].date):"Never")+'</div><div style="font-size:10px;color:#4a6040;font-family:sans-serif;text-transform:uppercase">'+row[2]+'</div></div>';
+  });
   body+='</div>';
 
   // ── QUICK LOG BUTTONS ─────────────────────────────────────────────────────
@@ -1348,10 +1345,24 @@ function renderHive(){
   document.getElementById("hive-body").innerHTML=body;
 }
 
-async function updHv(hid,field,val){
-  await SB.updateHive(hid,{[field]:val});
-  DB.hv=DB.hv.map(function(h){if(h.id!==hid)return h;const n=Object.assign({},h);n[field]=val;return n;});
+async function setHvBoxCount(hid,val){
+  val=Math.max(1,Math.min(10,parseInt(val)||1));
+  await SB.updateHive(hid,{box_count:val});
+  DB.hv=DB.hv.map(function(h){return h.id!==hid?h:Object.assign({},h,{box_count:val});});
   renderHive();
+  toast$("📦 "+val+" box"+(val!==1?"es":"")+" saved");
+}
+async function setHvBoxTypes(hid,val){
+  await SB.updateHive(hid,{box_types:val});
+  DB.hv=DB.hv.map(function(h){return h.id!==hid?h:Object.assign({},h,{box_types:val});});
+  renderHive();
+}
+async function setHvField(hid,field,val){
+  const update={};update[field]=val||null;
+  await SB.updateHive(hid,update);
+  DB.hv=DB.hv.map(function(h){if(h.id!==hid)return h;const n=Object.assign({},h);n[field]=val||null;return n;});
+  renderHive();
+  toast$("Saved ✓");
 }
 async function updHvStatus(hid,val){
   const yr=new Date().getFullYear();
@@ -2317,8 +2328,8 @@ function renderReports(){
     html+='<div class="sec" style="margin-top:12px">🔎 Hive Finder</div>';
     html+='<div class="card" style="margin-bottom:10px">';
     html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-bottom:10px">Find all hives matching a condition:</div>';
-    var finderKeys=["comb_super","pollen_trap","queen_excluder","three_boxes","queen_cells","strong"];
-    var finderLabels={comb_super:"🍯 Comb honey super",pollen_trap:"🌼 Pollen trap",queen_excluder:"👑 Queen excluder",three_boxes:"📦 3+ boxes",queen_cells:"🔶 Queen cells",strong:"💪 Strong"};
+    var finderKeys=["comb_super","pollen_trap","queen_excluder","three_boxes","queen_cells","strong","solid_board","screened_board","pollen_board","inner_feeder","top_feeder","yellow_feeder"];
+    var finderLabels={comb_super:"🍯 Comb super",pollen_trap:"🌼 Pollen trap",queen_excluder:"👑 Queen excluder",three_boxes:"📦 3+ boxes",queen_cells:"🔶 Queen cells",strong:"💪 Strong",solid_board:"🪵 Solid board",screened_board:"🔲 Screened board",pollen_board:"🌼 Pollen board",inner_feeder:"🍯 Inner feeder",top_feeder:"🍯 Top feeder",yellow_feeder:"🟡 Yellow feeder"};
     var activeQ=window._hiveFinderKey||"";
     html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
     finderKeys.forEach(function(k){
@@ -2475,6 +2486,32 @@ function renderReports(){
         html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif">'+s+'/'+t+'</div>';
         html+='</div>';
       });
+    }
+
+    // Bottom board winter survival comparison
+    const bbTypes=["solid","screened","pollen"];
+    const bbLabels={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen board"};
+    const bbRecorded=DB.hv.filter(function(h){return h.bottom_board&&h.winter_year===yr;});
+    if(bbRecorded.length>0){
+      html+='<div class="sec" style="margin-top:8px">🪵 Bottom Board — Winter Survival</div>';
+      html+='<div class="card">';
+      bbTypes.forEach(function(bb){
+        const hvs=bbRecorded.filter(function(h){return h.bottom_board===bb;});
+        if(hvs.length===0)return;
+        const s=hvs.filter(function(h){return h.winter_survived===true;}).length;
+        const t=hvs.length;
+        const r=Math.round((s/t)*100);
+        html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+        html+='<div style="font-size:14px;font-weight:700;min-width:120px">'+(bbLabels[bb]||bb)+'</div>';
+        html+='<div style="flex:1;background:#eee9db;border-radius:6px;height:12px;overflow:hidden">';
+        html+='<div style="background:'+(r>=70?"#3a7d44":r>=50?"#b87820":"#b83030")+';height:100%;width:'+r+'%;border-radius:6px"></div>';
+        html+='</div>';
+        html+='<div style="font-size:14px;font-weight:700;color:'+(r>=70?"#3a7d44":r>=50?"#b87820":"#b83030")+'">'+r+'%</div>';
+        html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif">'+s+'/'+t+'</div>';
+        html+='</div>';
+      });
+      html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif">Based on '+bbRecorded.length+' hives with bottom board recorded</div>';
+      html+='</div>';
     }
 
   // ── PRODUCTION ────────────────────────────────────────────────────────────
@@ -2701,7 +2738,7 @@ function setRepTab(t){
   window._opsSub="overdue_insp";
   window._feedSub="need";
   window._healthSub="issues";
-  try{renderReports();}catch(e){console.error("renderReports crash:",e);alert("Tab error: "+e.message);}
+  renderReports();
 }
 function runHiveFinder(key){
   window._hiveFinderKey=window._hiveFinderKey===key?"":key;
@@ -2717,6 +2754,12 @@ function runHiveFinder(key){
   else if(k==="three_boxes")results=DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});return 2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0)>=3;});
   else if(k==="queen_cells")results=DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});
   else if(k==="strong")results=DB.hv.filter(function(h){return h.str==="Strong";});
+  else if(k==="solid_board")results=DB.hv.filter(function(h){return h.bottom_board==="solid";});
+  else if(k==="screened_board")results=DB.hv.filter(function(h){return h.bottom_board==="screened";});
+  else if(k==="pollen_board")results=DB.hv.filter(function(h){return h.bottom_board==="pollen";});
+  else if(k==="inner_feeder")results=DB.hv.filter(function(h){return h.feeder==="inner";});
+  else if(k==="top_feeder")results=DB.hv.filter(function(h){return h.feeder==="top";});
+  else if(k==="yellow_feeder")results=DB.hv.filter(function(h){return h.feeder==="yellow_top";});
   const el=document.getElementById("hive-finder-results");
   if(!el)return;
   let html='<div style="font-size:14px;font-weight:700;color:#2d4a2d;margin-bottom:6px">'+results.length+' hive'+(results.length!==1?"s":"")+" found</div>";
@@ -2803,18 +2846,18 @@ function updateLogFields(){
   else if(logType==="swarm"){document.getElementById("log-swarm-fields").style.display="block";}
   else if(logType==="equipment"){document.getElementById("log-equip-fields").style.display="block";}
 }
-let logQ=null,logEggs=null,logQCells=null,logStr="",logBrd="";
+let logQ=null,logEggs=null,logQCells=null,logCappedBrood=null,logStr="",logBrd="";
 function renderInspFields(){
   const f=document.getElementById("log-insp-fields");
   if(!f)return;
-  // Queen seen / Eggs seen / Queen cells seen
+  // Queen seen / Eggs seen / Queen cells / Capped brood
   let html='<div style="background:#f5f1e8;border-radius:12px;padding:12px;margin-bottom:10px">';
-  html+='<div style="font-size:13px;font-weight:700;color:#4a6040;font-family:sans-serif;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Queen Status</div>';
-  // Row for each toggle
+  html+='<div style="font-size:13px;font-weight:700;color:#4a6040;font-family:sans-serif;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Hive Observations</div>';
   [
-    {id:"logQ",val:logQ,label:"👑 Queen seen",set:"setLogQ"},
-    {id:"logEggs",val:logEggs,label:"🥚 Eggs seen",set:"setLogEggs"},
-    {id:"logQCells",val:logQCells,label:"🔶 Queen cells",set:"setLogQCells"}
+    {val:logQ,label:"👑 Queen seen",set:"setLogQ"},
+    {val:logEggs,label:"🥚 Eggs seen",set:"setLogEggs"},
+    {val:logCappedBrood,label:"🍬 Capped brood",set:"setLogCappedBrood"},
+    {val:logQCells,label:"🔶 Queen cells",set:"setLogQCells"}
   ].forEach(function(row){
     html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
     html+='<span style="font-size:15px;font-family:sans-serif;color:#1a2e1a">'+row.label+'</span>';
@@ -2882,6 +2925,7 @@ function renderInspFields(){
 function setLogQ(v){logQ=v==="null"||v===null?null:(v==="true"||v===true);renderInspFields();}
 function setLogEggs(v){logEggs=v==="null"||v===null?null:(v==="true"||v===true);renderInspFields();}
 function setLogQCells(v){logQCells=v==="null"||v===null?null:(v==="true"||v===true);renderInspFields();}
+function setLogCappedBrood(v){logCappedBrood=v==="null"||v===null?null:(v==="true"||v===true);renderInspFields();}
 function setLogStr(s){logStr=s;renderInspFields();}
 function setLogBrd(b){logBrd=b;renderInspFields();}
 
@@ -2935,6 +2979,7 @@ async function saveLog(){
     ev.queen_seen=logQ;ev.str=logStr;ev.brood=logBrd;
     ev.eggs_seen=logEggs;
     ev.queen_cells=logQCells;
+    ev.capped_brood=logCappedBrood;
     const boxesAdded=document.getElementById("log-boxes-added")?parseInt(document.getElementById("log-boxes-added").value)||0:0;
     const framesAdded=document.getElementById("log-frames-added")?parseInt(document.getElementById("log-frames-added").value)||0:0;
     const boxType=document.getElementById("log-box-added-type")?document.getElementById("log-box-added-type").value:"";
@@ -3066,11 +3111,11 @@ async function saveLog(){
     const autoMsg=matchingTasks.length===1
       ?"✓ Logged + 1 task auto-completed"
       :"✓ Logged + "+matchingTasks.length+" tasks auto-completed";
-    logQ=null;logEggs=null;logQCells=null;logStr="";logBrd="";logFrames=0;
+    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";logFrames=0;
     closeModal("log-modal");
     toast$(autoMsg);
   } else {
-    logQ=null;logEggs=null;logQCells=null;logStr="";logBrd="";logFrames=0;
+    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";logFrames=0;
     closeModal("log-modal");
     toast$("Logged ✓");
   }
