@@ -341,6 +341,26 @@ a{text-decoration:none}
   <button class="nav-btn" data-s="reports" onclick="goScreen('reports')"><span class="nav-icon">📊</span><span class="nav-lbl">Reports</span></button>
 </nav>
 
+<!-- ── EDIT TASK MODAL ─────────────────────────────────────────────────── -->
+<div id="edit-task-modal" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div class="modal-title">Edit Task</div>
+      <button class="modal-close" onclick="closeModal('edit-task-modal')">×</button>
+    </div>
+    <label class="lbl">Task Type</label>
+    <select class="sel" id="edit-task-type"></select>
+    <label class="lbl">Due Date</label>
+    <input type="date" class="inp" id="edit-task-due">
+    <label class="lbl">Notes</label>
+    <textarea class="textarea" id="edit-task-notes" placeholder="What needs to be done…"></textarea>
+    <div style="display:flex;gap:10px;padding-bottom:20px;margin-top:4px">
+      <button class="btn-big" style="background:#3a7d44;flex:2;margin-bottom:0" onclick="saveEditTask()">✓ Save</button>
+      <button class="btn-sm" style="flex:1" onclick="closeModal('edit-task-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── EDIT EVENT MODAL ────────────────────────────────────────────────── -->
 <div id="edit-event-modal" class="modal-bg">
   <div class="modal-box">
@@ -393,12 +413,15 @@ a{text-decoration:none}
         <input class="inp" id="log-dur" placeholder="e.g. 42 days">
       </div>
       <div id="log-harvest-fields" style="display:none">
-        <label class="lbl">Frames Taken</label>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-          <button type="button" onclick="adjFrames(-1)" style="width:44px;height:44px;border-radius:10px;border:2px solid #c8bc98;background:#eee9db;font-size:22px;cursor:pointer;font-family:sans-serif">−</button>
-          <div id="log-frames-display" style="flex:1;text-align:center;font-size:24px;font-weight:800;font-family:sans-serif;color:#1a2e1a">0</div>
-          <button type="button" onclick="adjFrames(1)" style="width:44px;height:44px;border-radius:10px;border:2px solid #c8bc98;background:#eee9db;font-size:22px;cursor:pointer;font-family:sans-serif">+</button>
-          <input type="hidden" id="log-frames" value="0">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <label class="lbl">Regular Frames Taken</label>
+            <input type="number" class="inp" id="log-frames" placeholder="0" min="0" max="50" oninput="calcHarvestEst()">
+          </div>
+          <div>
+            <label class="lbl">Comb Honey Frames</label>
+            <input type="number" class="inp" id="log-frames-comb" placeholder="0" min="0" max="50" oninput="calcHarvestEst()">
+          </div>
         </div>
         <div id="log-frames-calc" style="background:#d4e8d0;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-family:sans-serif;font-size:14px;color:#2d4a2d;display:none">
           <div id="log-frames-lbs"></div>
@@ -406,19 +429,13 @@ a{text-decoration:none}
         </div>
         <label class="lbl">Box Type</label>
         <select class="sel" id="log-box-type">
-          <option value="super">Honey super</option>
-          <option value="comb">Comb honey box</option>
           <option value="medium">Medium super</option>
-          <option value="deep">Deep box</option>
+          <option value="comb">Comb honey box</option>
+          <option value="super">Deep honey super</option>
+          <option value="shallow">Shallow super</option>
         </select>
-        <label class="lbl">Frame Type</label>
-        <select class="sel" id="log-frame-type">
-          <option value="drawn">Built comb (drawn)</option>
-          <option value="foundation">Foundation</option>
-          <option value="empty">Empty frame</option>
-        </select>
-        <label class="lbl">Estimated Weight (lbs)</label>
-        <input type="number" class="inp" id="log-lbs" placeholder="Auto-calculated or enter manually">
+        <label class="lbl">Estimated Weight (lbs) — auto or edit</label>
+        <input type="number" class="inp" id="log-lbs" placeholder="Auto-calculated">
         <label class="lbl">Jars Returned to Host</label>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <input type="number" class="inp" style="flex:1" id="log-jars" placeholder="# jars">
@@ -431,6 +448,20 @@ a{text-decoration:none}
         </div>
         <label class="lbl">Date Jars Delivered</label>
         <input type="date" class="inp" id="log-jars-date">
+      </div>
+      <div id="log-equip-fields" style="display:none">
+        <label class="lbl">Equipment</label>
+        <select class="sel" id="log-equip-type">
+          <option value="pollen_trap">🌼 Pollen Trap</option>
+          <option value="propolis_trap">🟤 Propolis Trap</option>
+          <option value="queen_excluder">👑 Queen Excluder</option>
+        </select>
+        <label class="lbl">Action</label>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button type="button" id="equip-install-btn" onclick="setEquipAction('installed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#3a7d44;border:2px solid #3a7d44;color:#fff">📥 Installed</button>
+          <button type="button" id="equip-remove-btn" onclick="setEquipAction('removed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#eee9db;border:2px solid #b83030;color:#b83030">📤 Removed</button>
+        </div>
+        <input type="hidden" id="log-equip-action" value="installed">
       </div>
       <div id="log-install-fields" style="display:none">
         <label class="lbl">Breed</label>
@@ -566,11 +597,26 @@ const SB = {
       id: ev.id, apiary_id: ev.ap, hive_id: ev.hv || null,
       type: ev.type, date: ev.date, notes: ev.notes || null,
       queen_seen: ev.queen_seen !== undefined ? ev.queen_seen : null,
+      eggs_seen: ev.eggs_seen !== undefined ? ev.eggs_seen : null,
+      queen_cells: ev.queen_cells !== undefined ? ev.queen_cells : null,
       strength: ev.str || null, brood: ev.brood || null,
+      boxes_added: ev.boxes_added ? parseInt(ev.boxes_added) : null,
+      frames_added: ev.frames_added ? parseInt(ev.frames_added) : null,
+      problems: ev.problems || null,
       feed_type: ev.feed_type || null, amount: ev.amt || null,
       treat_type: ev.treat_type || null, duration: ev.dur || null,
       lbs: ev.lbs ? parseFloat(ev.lbs) : null,
+      frames: ev.frames ? parseInt(ev.frames) : null,
+      frames_comb: ev.frames_comb ? parseInt(ev.frames_comb) : null,
+      box_type: ev.box_type || null,
+      jars: ev.jars ? parseInt(ev.jars) : null,
+      jar_size: ev.jar_size || null,
+      jars_date: ev.jars_date || null,
       breed: ev.breed || null, source: ev.source || null,
+      swarm_type: ev.swarm_type || null,
+      swarm_dest: ev.swarm_dest || null,
+      equip_type: ev.equip_type || null,
+      equip_action: ev.equip_action || null,
     };
     const {error} = await supa.from('events').insert(row);
     if (error) console.error('addEvent error:', error);
@@ -733,6 +779,7 @@ const ET={
   harvest:{icon:"🫙",label:"Harvest",color:"#7b5ea7"},
   install:{icon:"📦",label:"Install",color:"#b06020"},
   swarm:{icon:"🐝",label:"Swarm",color:"#c0392b"},
+  equipment:{icon:"🔧",label:"Equipment",color:"#2060a0"},
   note:{icon:"📝",label:"Note",color:"#888888"}
 };
 
@@ -742,7 +789,8 @@ let DB = {ap:[], hv:[], ev:[], tk:[], tr:[]};
 // Map Supabase column names → app field names
 function mapAp(row){return{id:row.id,addr:row.addr,contact:row.contact,hives:row.hives,lat:row.lat,lng:row.lng,phone:row.phone||'',notes:row.notes||''};}
 function mapHv(row){return{id:row.id,ap:row.apiary_id,n:row.num,breed:row.breed,queen:row.queen||'Unknown',str:row.strength||'Medium',risk:row.risk,notes:row.notes||'',status:row.hive_status||'active',winter_survived:row.winter_survived===null||row.winter_survived===undefined?null:row.winter_survived,winter_year:row.winter_year||null};}
-function mapEv(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:row.date,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,str:row.strength,brood:row.brood,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,breed:row.breed,source:row.source};}
+function mapEv(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:row.date,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,equip_type:row.equip_type,equip_action:row.equip_action};}
+
 function mapTk(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,ttype:row.task_type,notes:row.notes,due:row.due_date,status:row.status,ts:row.created_at};}
 
 async function initDB(){
@@ -949,19 +997,36 @@ function eventRowHTML(ev,showAddr){
   else if(!showAddr&&hv)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif">Hive '+hv.n+'</div>';
   if(ev.type==="inspection"){
     let pills="";
-    if(ev.queen_seen===true)pills+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">👑 Seen</span>';
+    if(ev.queen_seen===true)pills+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">👑 Queen ✓</span>';
     else if(ev.queen_seen===false)pills+='<span class="pill" style="background:#b8303020;border:1.5px solid #b8303050;color:#b83030">👑 No queen</span>';
+    if(ev.eggs_seen===true)pills+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">🥚 Eggs ✓</span>';
+    if(ev.queen_cells===true)pills+='<span class="pill" style="background:#b8303020;border:1.5px solid #b8303050;color:#b83030">🔶 QC found</span>';
     if(ev.str)pills+='<span class="pill" style="background:#3a7d4420;border:1.5px solid #3a7d4450;color:#3a7d44">'+ev.str+'</span>';
-    if(ev.brood)pills+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">Brood: '+ev.brood+'</span>';
-    if(pills)h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">'+pills+'</div>';
+    if(ev.brood)pills+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+ev.brood+' brood</span>';
+    if(ev.boxes_added&&ev.boxes_added!=0)pills+='<span class="pill" style="background:#8a9e8020;border:1.5px solid #8a9e8050;color:#4a6040">📦 '+(ev.boxes_added>0?"+":"")+ev.boxes_added+' box'+(Math.abs(ev.boxes_added)!==1?"es":"")+'</span>';
+    if(ev.frames_added&&ev.frames_added!=0)pills+='<span class="pill" style="background:#8a9e8020;border:1.5px solid #8a9e8050;color:#4a6040">🖼 '+(ev.frames_added>0?"+":"")+ev.frames_added+' frames</span>';
+    if(pills)h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">'+pills+'</div>';
   }
   if(ev.type==="feeding"&&ev.feed_type)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:4px">'+ev.feed_type+(ev.amt?" · "+ev.amt:"")+'</div>';
   if(ev.type==="treatment"&&ev.treat_type)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:4px">'+ev.treat_type+(ev.dur?" · "+ev.dur:"")+'</div>';
-  if(ev.type==="harvest"&&ev.lbs)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:4px">'+ev.lbs+' lbs</div>';
-  if(ev.notes)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:5px">'+ev.notes+'</div>';
+  if(ev.type==="harvest"){
+    let harv="";
+    if(ev.frames)harv+='<span class="pill" style="background:#6040a020;border:1.5px solid #6040a050;color:#6040a0">🖼 '+ev.frames+' frames</span>';
+    if(ev.frames_comb)harv+='<span class="pill" style="background:#6040a020;border:1.5px solid #6040a050;color:#6040a0">🍯 '+ev.frames_comb+' comb</span>';
+    if(ev.lbs)harv+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">~'+ev.lbs+' lbs</span>';
+    if(ev.jars)harv+='<span class="pill" style="background:#3a7d4420;border:1.5px solid #3a7d4450;color:#3a7d44">🫙 '+ev.jars+' jars ('+( ev.jar_size||"8.8oz")+')</span>';
+    if(harv)h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">'+harv+'</div>';
+    if(ev.jars_date)h+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif;margin-top:3px">Delivered '+fmtD(ev.jars_date)+'</div>';
+  }
+  if(ev.type==="swarm"){
+    const swarmLabels={primary:"Primary swarm",afterswarm:"Afterswarm",caught:"Caught swarm",lost:"Lost swarm",cells_found:"Queen cells found"};
+    if(ev.swarm_type)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:4px">'+( swarmLabels[ev.swarm_type]||ev.swarm_type)+'</div>';
+    if(ev.swarm_dest)h+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif;margin-top:2px">→ '+escHtml(ev.swarm_dest)+'</div>';
+  }
+  if(ev.notes)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:5px;white-space:pre-wrap">'+escHtml(ev.notes)+'</div>';
   h+='<div style="display:flex;gap:8px;margin-top:8px">';
-  h+='<button onclick="editEvent(\''+ev.id+'\')" style="padding:4px 12px;background:none;border:1px solid #c8bc98;border-radius:6px;color:#4a6040;font-size:12px;font-family:sans-serif;cursor:pointer">✏️ Edit</button>';
-  h+='<button onclick="deleteEvent(\''+ev.id+'\')" style="padding:4px 12px;background:none;border:1px solid #e0c8c8;border-radius:6px;color:#b83030;font-size:12px;font-family:sans-serif;cursor:pointer">🗑 Remove</button>';
+  h+='<button onclick="editEvent(\''+ev.id+'\')" style="padding:6px 14px;background:none;border:1.5px solid #c8bc98;border-radius:8px;color:#4a6040;font-size:13px;font-family:sans-serif;cursor:pointer;min-height:36px">✏️ Edit</button>';
+  h+='<button onclick="deleteEvent(\''+ev.id+'\')" style="padding:6px 14px;background:none;border:1.5px solid #e0c8c8;border-radius:8px;color:#b83030;font-size:13px;font-family:sans-serif;cursor:pointer;min-height:36px">🗑 Remove</button>';
   h+='</div>';
   h+='</div></div></div>';
   return h;
@@ -980,7 +1045,10 @@ function taskRowHTML(t,showAddr){
   if(hv)h+='<span style="font-size:15px;color:#4a6040;font-family:sans-serif;font-weight:600">Hive '+hv.n+'</span>';
   h+='<span style="font-size:14px;font-family:sans-serif;margin-left:auto;'+(od?"color:#b83030;font-weight:700":"color:#8a9e80")+'">'+( od?"⚠️ ":"")+fmtD(t.due)+'</span>';
   h+='</div>';
-  if(t.notes)h+='<div style="font-size:14px;color:#4a6040;margin-top:4px;font-family:sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.notes+'</div>';
+  if(t.notes)h+='<div style="font-size:14px;color:#4a6040;margin-top:4px;font-family:sans-serif">'+escHtml(t.notes)+'</div>';
+  h+='<div style="display:flex;gap:6px;margin-top:6px">';
+  h+='<button onclick="editTask(\''+t.id+'\')" style="padding:5px 12px;background:none;border:1.5px solid #c8bc98;border-radius:8px;color:#4a6040;font-size:13px;font-family:sans-serif;cursor:pointer;min-height:34px">✏️ Edit</button>';
+  h+='</div>';
   h+='</div>';
   h+='<div style="display:flex;flex-direction:column;gap:5px">';
   h+='<button class="tick-btn" onclick="doneTask(\''+t.id+'\')">✓</button>';
@@ -1138,11 +1206,64 @@ function renderHive(){
     body+='</div>';
   }
 
-  // ── QUICK STATS ───────────────────────────────────────────────────────────
-  body+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">';
-  [[li,"🔍","Inspect","#3a7d44"],[lf,"🍯","Feed","#b87820"],[lt,"💊","Treat","#2060a0"]].forEach(function(row){
-    body+='<div class="sc-card"><div style="font-size:18px">'+row[1]+'</div><div style="font-size:13px;font-weight:700;color:'+row[3]+';font-family:sans-serif">'+(row[0]?dAgo(row[0].date):"Never")+'</div><div style="font-size:10px;color:#4a6040;font-family:sans-serif;text-transform:uppercase">'+row[2]+'</div></div>';
-  });
+  // ── HIVE SUMMARY CARD ────────────────────────────────────────────────────
+  // Calculate box count from inspection logs
+  const boxEvents=evts.filter(function(e){return e.type==="inspection"&&e.boxes_added&&e.boxes_added!=0;});
+  const baseBoxes=(h.status||"active")==="active"?2:0; // New hives start with 2 medium boxes
+  const totalBoxesAdded=boxEvents.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);
+  const boxCount=baseBoxes+totalBoxesAdded;
+  // Equipment from events
+  const equipEvts=evts.filter(function(e){return e.type==="equipment";});
+  const activeEquip=equipEvts.filter(function(e){return e.equip_action==="installed";}).map(function(e){return e.equip_type;});
+  const removedEquip=equipEvts.filter(function(e){return e.equip_action==="removed";}).map(function(e){return e.equip_type;});
+  const currentEquip=[...new Set(activeEquip.filter(function(eq){return!removedEquip.includes(eq);}))];
+
+  body+='<div class="card" style="margin-bottom:14px;background:#f0f7f0;border-left:4px solid #3a7d44">';
+  body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d;margin-bottom:10px">📊 Hive Summary</div>';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:sans-serif">';
+  // Last inspection data
+  if(li){
+    body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+    body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Last Inspection</div>';
+    body+='<div style="font-size:14px;font-weight:700;color:#1a2e1a">'+fmtD(li.date)+'</div>';
+    if(li.str)body+='<div style="font-size:12px;color:#3a7d44;font-weight:600">'+li.str+'</div>';
+    if(li.brood)body+='<div style="font-size:12px;color:#4a6040">'+li.brood+' brood</div>';
+    body+='</div>';
+  } else {
+    body+='<div style="background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Inspection</div><div style="font-size:14px;color:#b83030;font-weight:700">Never</div></div>';
+  }
+  // Box count
+  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Boxes</div>';
+  body+='<div style="font-size:24px;font-weight:800;color:#2d4a2d">'+boxCount+'</div>';
+  body+='<div style="font-size:12px;color:#4a6040">medium'+(totalBoxesAdded>0?" (+"+totalBoxesAdded+" added)":"")+' </div>';
+  body+='</div>';
+  // Queen status from last inspection
+  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Queen</div>';
+  if(li&&li.queen_seen===true)body+='<div style="font-size:14px;font-weight:700;color:#3a7d44">👑 Seen</div>';
+  else if(li&&li.queen_seen===false)body+='<div style="font-size:14px;font-weight:700;color:#b83030">👑 Not seen</div>';
+  else if(h.queen&&h.queen!=="Unknown")body+='<div style="font-size:14px;font-weight:700;color:#b87820">'+h.queen+'</div>';
+  else body+='<div style="font-size:14px;color:#8a9e80">Unknown</div>';
+  if(li&&li.eggs_seen===true)body+='<div style="font-size:12px;color:#3a7d44">🥚 Eggs seen</div>';
+  if(li&&li.queen_cells===true)body+='<div style="font-size:12px;color:#b83030">🔶 Queen cells!</div>';
+  body+='</div>';
+  // Last feeding
+  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Fed</div>';
+  if(lf)body+='<div style="font-size:14px;font-weight:700;color:#b87820">'+dAgo(lf.date)+'</div><div style="font-size:12px;color:#4a6040">'+fmtD(lf.date)+'</div>';
+  else body+='<div style="font-size:14px;color:#b83030;font-weight:700">Never</div>';
+  body+='</div>';
+  body+='</div>';
+  // Equipment
+  if(currentEquip.length>0){
+    body+='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">';
+    const equipIcons={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder"};
+    currentEquip.forEach(function(eq){
+      body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(equipIcons[eq]||eq)+'</span>';
+    });
+    body+='</div>';
+  }
   body+='</div>';
 
   // ── QUICK LOG BUTTONS ─────────────────────────────────────────────────────
@@ -2461,6 +2582,39 @@ function renderReports(){
   }
   document.getElementById("rep-body").innerHTML=html;
 }
+let editingTaskId=null;
+function editTask(id){
+  const t=DB.tk.find(function(x){return x.id===id;});
+  if(!t)return;
+  editingTaskId=id;
+  // Populate task type dropdown
+  const sel=document.getElementById("edit-task-type");
+  sel.innerHTML=Object.keys(ET).map(function(k){
+    return'<option value="'+k+'"'+(t.ttype===k?" selected":"")+'>'+ET[k].icon+' '+ET[k].label+'</option>';
+  }).join("");
+  document.getElementById("edit-task-due").value=t.due||"";
+  document.getElementById("edit-task-notes").value=t.notes||"";
+  openModal("edit-task-modal");
+}
+async function saveEditTask(){
+  if(!editingTaskId)return;
+  const ttype=document.getElementById("edit-task-type").value;
+  const due=document.getElementById("edit-task-due").value;
+  const notes=document.getElementById("edit-task-notes").value;
+  const {error}=await supa.from("tasks").update({task_type:ttype,due_date:due||null,notes:notes||null}).eq("id",editingTaskId);
+  if(error){toast$("Save failed",true);return;}
+  DB.tk=DB.tk.map(function(t){
+    if(t.id!==editingTaskId)return t;
+    return Object.assign({},t,{ttype:ttype,due:due||null,notes:notes||null});
+  });
+  editingTaskId=null;
+  closeModal("edit-task-modal");
+  toast$("Task updated ✓");
+  if(currentScreen==="hive")renderHive();
+  else if(currentScreen==="workplan")renderWorkplan();
+  else if(currentScreen==="apiary")renderApiary();
+}
+
 let editingEventId=null;
 function editEvent(id){
   const ev=DB.ev.find(function(e){return e.id===id;});
@@ -2571,9 +2725,13 @@ function setLogType(t){
   updateLogFields();
 }
 function updateLogFields(){
-  const fields=["insp","feed","treat","harvest","install"];
+  const fields=["insp","feed","treat","harvest","install","equip"];
   fields.forEach(function(f){
     const el=document.getElementById("log-"+f+"-fields");
+    if(el)el.style.display="none";
+  });
+  ["log-swarm-fields"].forEach(function(id){
+    const el=document.getElementById(id);
     if(el)el.style.display="none";
   });
   if(logType==="inspection"){
@@ -2584,6 +2742,7 @@ function updateLogFields(){
   else if(logType==="harvest"){document.getElementById("log-harvest-fields").style.display="block";}
   else if(logType==="install"){document.getElementById("log-install-fields").style.display="block";}
   else if(logType==="swarm"){document.getElementById("log-swarm-fields").style.display="block";}
+  else if(logType==="equipment"){document.getElementById("log-equip-fields").style.display="block";}
 }
 let logQ=null,logEggs=null,logQCells=null,logStr="",logBrd="";
 function renderInspFields(){
@@ -2649,29 +2808,37 @@ function setLogQCells(v){logQCells=v==="null"||v===null?null:(v==="true"||v===tr
 function setLogStr(s){logStr=s;renderInspFields();}
 function setLogBrd(b){logBrd=b;renderInspFields();}
 
-// Harvest frame counter
-let logFrames=0;
-function adjFrames(delta){
-  logFrames=Math.max(0,logFrames+delta);
-  document.getElementById("log-frames").value=logFrames;
-  document.getElementById("log-frames-display").textContent=logFrames;
-  const lbsEst=Math.round(logFrames*5.5*10)/10;
-  document.getElementById("log-lbs").value=logFrames>0?lbsEst:"";
-  // Jar calculation — get hive count at selected apiary
-  const apId=document.getElementById("log-ap").value;
-  const hvId=document.getElementById("log-hv").value;
-  const calc=document.getElementById("log-frames-calc");
-  if(logFrames>0){
+function calcHarvestEst(){
+  const frames=parseInt(document.getElementById("log-frames").value)||0;
+  const framesComb=parseInt(document.getElementById("log-frames-comb").value)||0;
+  const totalFrames=frames+framesComb;
+  // Medium frame = 2.2-2.5 lbs, use 2.35 average
+  const lbsEst=Math.round(totalFrames*2.35*10)/10;
+  if(totalFrames>0){
+    document.getElementById("log-lbs").value=lbsEst;
+    const calc=document.getElementById("log-frames-calc");
     calc.style.display="block";
-    document.getElementById("log-frames-lbs").textContent="🍯 Est. "+lbsEst+" lbs ("+logFrames+" frames × 5.5 lbs avg)";
-    // Jar estimate: 1 hive=48 jars, each additional=36 jars
+    let lbsText="🍯 Est. "+lbsEst+" lbs ("+totalFrames+" frames × 2.35 lbs avg)";
+    if(framesComb>0&&frames>0)lbsText="🍯 Est. "+lbsEst+" lbs ("+frames+" honey + "+framesComb+" comb frames)";
+    document.getElementById("log-frames-lbs").textContent=lbsText;
+    // Jar calc
+    const apId=document.getElementById("log-ap").value;
+    const hvId=document.getElementById("log-hv").value;
     const hiveCount=hvId?1:DB.hv.filter(function(h){return h.ap===apId&&(h.status||"active")==="active";}).length;
     const jars=hiveCount<=1?48:48+((hiveCount-1)*36);
     document.getElementById("log-frames-jars").textContent="🫙 Est. "+jars+" jars of 8.8oz to return to host";
     document.getElementById("log-jars").value=jars;
   } else {
-    calc.style.display="none";
+    document.getElementById("log-frames-calc").style.display="none";
+    document.getElementById("log-lbs").value="";
   }
+}
+function setEquipAction(action){
+  document.getElementById("log-equip-action").value=action;
+  document.getElementById("equip-install-btn").style.background=action==="installed"?"#3a7d44":"#eee9db";
+  document.getElementById("equip-install-btn").style.color=action==="installed"?"#fff":"#3a7d44";
+  document.getElementById("equip-remove-btn").style.background=action==="removed"?"#b83030":"#eee9db";
+  document.getElementById("equip-remove-btn").style.color=action==="removed"?"#fff":"#b83030";
 }
 function logApChanged(){
   const apId=document.getElementById("log-ap").value;
@@ -2703,17 +2870,16 @@ async function saveLog(){
   else if(logType==="treatment"){ev.treat_type=document.getElementById("log-treat-type").value;ev.dur=document.getElementById("log-dur").value;}
   else if(logType==="harvest"){
     ev.frames=parseInt(document.getElementById("log-frames").value)||0;
+    ev.frames_comb=parseInt(document.getElementById("log-frames-comb").value)||0;
     ev.lbs=document.getElementById("log-lbs").value;
     ev.box_type=document.getElementById("log-box-type").value;
-    ev.frame_type=document.getElementById("log-frame-type").value;
     ev.jars=document.getElementById("log-jars").value;
     ev.jar_size=document.getElementById("log-jar-size").value;
     ev.jars_date=document.getElementById("log-jars-date").value;
-    // Build notes summary
     const parts=[];
-    if(ev.frames)parts.push(ev.frames+" frames taken");
+    if(ev.frames)parts.push(ev.frames+" honey frames");
+    if(ev.frames_comb)parts.push(ev.frames_comb+" comb honey frames");
     if(ev.box_type)parts.push(ev.box_type);
-    if(ev.frame_type)parts.push(ev.frame_type);
     if(ev.jars)parts.push(ev.jars+" jars ("+ev.jar_size+") returned");
     if(ev.jars_date)parts.push("delivered "+fmtD(ev.jars_date));
     if(parts.length&&!ev.notes)ev.notes=parts.join(" · ");
@@ -2722,11 +2888,16 @@ async function saveLog(){
   else if(logType==="swarm"){
     ev.swarm_type=document.getElementById("log-swarm-type").value;
     ev.swarm_dest=document.getElementById("log-swarm-dest").value;
-    // Auto-create follow-up task to check for laying queen
     if(!followup){
       const dt=new Date();dt.setDate(dt.getDate()+21);
       document.getElementById("log-followup").value=dt.toISOString().split("T")[0];
     }
+  }
+  else if(logType==="equipment"){
+    ev.equip_type=document.getElementById("log-equip-type").value;
+    ev.equip_action=document.getElementById("log-equip-action").value;
+    const equipNames={pollen_trap:"Pollen trap",propolis_trap:"Propolis trap",queen_excluder:"Queen excluder"};
+    if(!ev.notes)ev.notes=(ev.equip_action==="installed"?"Installed":"Removed")+" "+(equipNames[ev.equip_type]||ev.equip_type);
   }
 
   const ok = await SB.addEvent(ev);
