@@ -2695,6 +2695,7 @@ async function deleteEvent(id){
 }
 
 function setSelHvById(id){selHv=getHv(id);}
+function setRepTab(t){repTab=t;window._hiveFinderKey="";renderReports();}
 function runHiveFinder(key){
   window._hiveFinderKey=window._hiveFinderKey===key?"":key;
   // Re-render the reports page
