@@ -2670,20 +2670,23 @@ function editEvent(id){
   const ev=DB.ev.find(function(e){return e.id===id;});
   if(!ev){toast$("Entry not found",true);return;}
   editingEventId=id;
-  document.getElementById("edit-ev-date").value=ev.date||"";
-  document.getElementById("edit-ev-notes").value=ev.notes||"";
-  const srcInput=document.getElementById("edit-ev-source");
-  const srcLabel=document.getElementById("edit-ev-source-label");
-  if(srcInput)srcInput.value=ev.source||"";
-  // Show source field only for installs
-  if(ev.type==="install"){
-    if(srcInput)srcInput.style.display="block";
-    if(srcLabel)srcLabel.style.display="block";
-  } else {
-    if(srcInput)srcInput.style.display="none";
-    if(srcLabel)srcLabel.style.display="none";
-  }
-  openModal("edit-event-modal");
+  // Build and inject modal directly into body to avoid z-index issues
+  const existing=document.getElementById("edit-event-modal");
+  if(existing)existing.remove();
+  const isInstall=ev.type==="install";
+  const div=document.createElement("div");
+  div.id="edit-event-modal";
+  div.className="modal-bg open";
+  div.style.zIndex="9999";
+  div.innerHTML='<div class="modal-box"><div class="modal-hdr"><div class="modal-title">Edit Log Entry</div><button class="modal-close" onclick="closeModal(\'edit-event-modal\')">×</button></div>'
+    +'<label class="lbl">Date</label><input type="date" class="inp" id="edit-ev-date" value="'+( ev.date||"")+'">'
+    +'<label class="lbl">Notes</label><textarea class="textarea" id="edit-ev-notes" placeholder="Notes…">'+escHtml(ev.notes||"")+'</textarea>'
+    +(isInstall?'<label class="lbl">Source</label><input class="inp" id="edit-ev-source" placeholder="e.g. Mountain Sweet Honey" value="'+escHtml(ev.source||"")+'">':"")
+    +'<div style="display:flex;gap:10px;padding-bottom:20px;margin-top:4px">'
+    +'<button class="btn-big" style="background:#3a7d44;flex:2;margin-bottom:0" onclick="saveEditEvent()">✓ Save Changes</button>'
+    +'<button class="btn-sm" style="flex:1" onclick="closeModal(\'edit-event-modal\')">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(div);
 }
 
 async function saveEditEvent(){
