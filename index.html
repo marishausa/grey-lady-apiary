@@ -1212,7 +1212,7 @@ function renderHive(){
   const baseBoxes=(h.status||"active")==="active"?2:0;
   const totalBoxesAdded=boxEvents.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);
   const boxCount=baseBoxes+totalBoxesAdded;
-  const combSuperAdded=boxEvents.some(function(e){return e.boxes_added>0&&e.box_type==="comb_super";});
+  const combSuperAdded=boxEvents.some(function(e){return parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});
   // Equipment from events
   const equipEvts=evts.filter(function(e){return e.type==="equipment";});
   const activeEquip=equipEvts.filter(function(e){return e.equip_action==="installed";}).map(function(e){return e.equip_type;});
@@ -2319,7 +2319,7 @@ function renderReports(){
     html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-bottom:10px">Find all hives matching a condition:</div>';
     html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
     const queries=[
-      {l:"🍯 Comb honey super",fn:function(){return DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added>0&&e.box_type==="comb_super";});});}},
+      {l:"🍯 Comb honey super",fn:function(){return DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});});}},
       {l:"🌼 Pollen trap",fn:function(){
         return DB.hv.filter(function(h){
           const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="pollen_trap";});
@@ -2474,14 +2474,13 @@ function renderReports(){
       html+='<div class="sec" style="margin-top:8px">❓ Not Yet Recorded ('+notRecorded.length+')</div>';
       html+='<div class="card" style="background:#f5f1e8;margin-bottom:8px">';
       html+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-bottom:8px">Tap each hive and record its winter outcome to complete this report.</div>';
-      notRecorded.slice(0,10).forEach(function(h){
+      notRecorded.forEach(function(h){
         const ap=getAp(h.ap);
         html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #c8bc98">';
         html+='<div style="font-size:14px;color:#1a2e1a">'+(ap?ap.addr:"")+" · Hive "+h.n+(h.breed?" · "+h.breed:"")+'</div>';
         html+='<button onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')" style="padding:6px 12px;background:#2060a0;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Record →</button>';
         html+='</div>';
       });
-      if(notRecorded.length>10)html+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif;margin-top:6px">...and '+(notRecorded.length-10)+' more</div>';
       html+='</div>';
     }
 
