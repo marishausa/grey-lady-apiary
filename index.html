@@ -2340,12 +2340,13 @@ function renderReports(){
       {l:"🔶 Queen cells",fn:function(){return DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});}},
       {l:"💪 Strong",fn:function(){return DB.hv.filter(function(h){return h.str==="Strong";});}},
     ];
-    const activeQ=window._hiveFinder||null;
+    const activeQ=window._hiveFinder!==undefined?window._hiveFinder:null;
     queries.forEach(function(q,i){
-      html+='<button onclick="window._hiveFinder='+(activeQ===i?"null":i)+';renderReports()" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(activeQ===i?"#3a7d44":"#eee9db")+';color:'+(activeQ===i?"#fff":"#3a7d44")+'">'+q.l+'</button>';
+      const isActive=activeQ===i;
+      html+='<button onclick="window._hiveFinder='+(isActive?"null":i)+';renderReports()" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(isActive?"#3a7d44":"#eee9db")+';color:'+(isActive?"#fff":"#3a7d44")+'">'+q.l+'</button>';
     });
     html+='</div>';
-    if(activeQ!==null&&queries[activeQ]){
+    if(activeQ!==null&&activeQ!==undefined&&queries[activeQ]){
       const results=queries[activeQ].fn();
       html+='<div style="margin-top:12px;font-size:14px;font-weight:700;color:#2d4a2d">'+results.length+' hives match:</div>';
       if(results.length===0){html+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif;margin-top:4px">None found</div>';}
