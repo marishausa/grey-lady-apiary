@@ -2317,38 +2317,25 @@ function renderReports(){
     html+='<div class="sec" style="margin-top:12px">🔎 Hive Finder</div>';
     html+='<div class="card" style="margin-bottom:10px">';
     html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-bottom:10px">Find all hives matching a condition:</div>';
+    // Hive Finder — use string keys to avoid 0=falsy bug
+    const queries={
+      comb_super:{l:"🍯 Comb honey super",fn:function(){return DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});});}},
+      pollen_trap:{l:"🌼 Pollen trap",fn:function(){return DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="pollen_trap";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});}},
+      queen_excluder:{l:"👑 Queen excluder",fn:function(){return DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="queen_excluder";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});}},
+      three_boxes:{l:"📦 3+ boxes",fn:function(){return DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});const tot=2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);return tot>=3;});}},
+      queen_cells:{l:"🔶 Queen cells",fn:function(){return DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});}},
+      strong:{l:"💪 Strong",fn:function(){return DB.hv.filter(function(h){return h.str==="Strong";});}},
+    };
+    const activeQ=window._hiveFinder||"";
     html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-    const queries=[
-      {l:"🍯 Comb honey super",fn:function(){return DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});});}},
-      {l:"🌼 Pollen trap",fn:function(){
-        return DB.hv.filter(function(h){
-          const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="pollen_trap";});
-          const installed=ins.filter(function(e){return e.equip_action==="installed";}).length;
-          const removed=ins.filter(function(e){return e.equip_action==="removed";}).length;
-          return installed>removed;
-        });
-      }},
-      {l:"👑 Queen excluder",fn:function(){
-        return DB.hv.filter(function(h){
-          const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="queen_excluder";});
-          const installed=ins.filter(function(e){return e.equip_action==="installed";}).length;
-          const removed=ins.filter(function(e){return e.equip_action==="removed";}).length;
-          return installed>removed;
-        });
-      }},
-      {l:"📦 3+ boxes",fn:function(){return DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});const tot=2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);return tot>=3;});}},
-      {l:"🔶 Queen cells",fn:function(){return DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});}},
-      {l:"💪 Strong",fn:function(){return DB.hv.filter(function(h){return h.str==="Strong";});}},
-    ];
-    const activeQ=window._hiveFinder!==undefined?window._hiveFinder:null;
-    queries.forEach(function(q,i){
-      const isActive=activeQ===i;
-      html+='<button onclick="window._hiveFinder='+(isActive?"null":i)+';renderReports()" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(isActive?"#3a7d44":"#eee9db")+';color:'+(isActive?"#fff":"#3a7d44")+'">'+q.l+'</button>';
+    Object.keys(queries).forEach(function(k){
+      const isActive=activeQ===k;
+      html+='<button onclick="window._hiveFinder=\''+(isActive?"":k)+'\';renderReports()" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(isActive?"#3a7d44":"#eee9db")+';color:'+(isActive?"#fff":"#3a7d44")+'">'+queries[k].l+'</button>';
     });
     html+='</div>';
-    if(activeQ!==null&&activeQ!==undefined&&queries[activeQ]){
+    if(activeQ&&queries[activeQ]){
       const results=queries[activeQ].fn();
-      html+='<div style="margin-top:12px;font-size:14px;font-weight:700;color:#2d4a2d">'+results.length+' hives match:</div>';
+      html+='<div style="margin-top:12px;font-size:14px;font-weight:700;color:#2d4a2d">'+results.length+' hive'+(results.length!==1?"s":"")+" match:</div>";
       if(results.length===0){html+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif;margin-top:4px">None found</div>';}
       results.forEach(function(h){
         const ap=getAp(h.ap);
