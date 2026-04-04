@@ -1207,11 +1207,12 @@ function renderHive(){
   }
 
   // ── HIVE SUMMARY CARD ────────────────────────────────────────────────────
-  // Calculate box count from inspection logs
+  // Calculate boxes from inspection logs - track by type
   const boxEvents=evts.filter(function(e){return e.type==="inspection"&&e.boxes_added&&e.boxes_added!=0;});
-  const baseBoxes=(h.status||"active")==="active"?2:0; // New hives start with 2 medium boxes
+  const baseBoxes=(h.status||"active")==="active"?2:0;
   const totalBoxesAdded=boxEvents.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);
   const boxCount=baseBoxes+totalBoxesAdded;
+  const combSuperAdded=boxEvents.some(function(e){return e.boxes_added>0&&e.box_type==="comb_super";});
   // Equipment from events
   const equipEvts=evts.filter(function(e){return e.type==="equipment";});
   const activeEquip=equipEvts.filter(function(e){return e.equip_action==="installed";}).map(function(e){return e.equip_type;});
@@ -1221,7 +1222,7 @@ function renderHive(){
   body+='<div class="card" style="margin-bottom:14px;background:#f0f7f0;border-left:4px solid #3a7d44">';
   body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d;margin-bottom:10px">📊 Hive Summary</div>';
   body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:sans-serif">';
-  // Last inspection data
+  // Last inspection
   if(li){
     body+='<div style="background:#fff;border-radius:8px;padding:8px">';
     body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Last Inspection</div>';
@@ -1232,32 +1233,35 @@ function renderHive(){
   } else {
     body+='<div style="background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Inspection</div><div style="font-size:14px;color:#b83030;font-weight:700">Never</div></div>';
   }
-  // Box count
+  // Box count with type breakdown
   body+='<div style="background:#fff;border-radius:8px;padding:8px">';
   body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Boxes</div>';
   body+='<div style="font-size:24px;font-weight:800;color:#2d4a2d">'+boxCount+'</div>';
-  body+='<div style="font-size:12px;color:#4a6040">medium'+(totalBoxesAdded>0?" (+"+totalBoxesAdded+" added)":"")+' </div>';
-  body+='</div>';
-  // Queen status from last inspection
+  body+='<div style="font-size:11px;color:#4a6040">';
+  if(combSuperAdded)body+='🍯 Comb super ✓';
+  else body+='medium';
+  body+='</div></div>';
+  // Queen
   body+='<div style="background:#fff;border-radius:8px;padding:8px">';
   body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Queen</div>';
   if(li&&li.queen_seen===true)body+='<div style="font-size:14px;font-weight:700;color:#3a7d44">👑 Seen</div>';
   else if(li&&li.queen_seen===false)body+='<div style="font-size:14px;font-weight:700;color:#b83030">👑 Not seen</div>';
   else if(h.queen&&h.queen!=="Unknown")body+='<div style="font-size:14px;font-weight:700;color:#b87820">'+h.queen+'</div>';
   else body+='<div style="font-size:14px;color:#8a9e80">Unknown</div>';
-  if(li&&li.eggs_seen===true)body+='<div style="font-size:12px;color:#3a7d44">🥚 Eggs seen</div>';
+  if(li&&li.eggs_seen===true)body+='<div style="font-size:12px;color:#3a7d44">🥚 Eggs ✓</div>';
   if(li&&li.queen_cells===true)body+='<div style="font-size:12px;color:#b83030">🔶 Queen cells!</div>';
   body+='</div>';
-  // Last feeding
+  // Last fed
   body+='<div style="background:#fff;border-radius:8px;padding:8px">';
   body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Fed</div>';
   if(lf)body+='<div style="font-size:14px;font-weight:700;color:#b87820">'+dAgo(lf.date)+'</div><div style="font-size:12px;color:#4a6040">'+fmtD(lf.date)+'</div>';
   else body+='<div style="font-size:14px;color:#b83030;font-weight:700">Never</div>';
   body+='</div>';
   body+='</div>';
-  // Equipment
-  if(currentEquip.length>0){
+  // Equipment badges
+  if(currentEquip.length>0||combSuperAdded){
     body+='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">';
+    if(combSuperAdded)body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">🍯 Comb honey super</span>';
     const equipIcons={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder"};
     currentEquip.forEach(function(eq){
       body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(equipIcons[eq]||eq)+'</span>';
@@ -2309,6 +2313,52 @@ function renderReports(){
       });
     }
 
+    // ── HIVE FINDER ───────────────────────────────────────────────────────────
+    html+='<div class="sec" style="margin-top:12px">🔎 Hive Finder</div>';
+    html+='<div class="card" style="margin-bottom:10px">';
+    html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-bottom:10px">Find all hives matching a condition:</div>';
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    const queries=[
+      {l:"🍯 Comb honey super",fn:function(){return DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added>0&&e.box_type==="comb_super";});});}},
+      {l:"🌼 Pollen trap",fn:function(){
+        return DB.hv.filter(function(h){
+          const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="pollen_trap";});
+          const installed=ins.filter(function(e){return e.equip_action==="installed";}).length;
+          const removed=ins.filter(function(e){return e.equip_action==="removed";}).length;
+          return installed>removed;
+        });
+      }},
+      {l:"👑 Queen excluder",fn:function(){
+        return DB.hv.filter(function(h){
+          const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="queen_excluder";});
+          const installed=ins.filter(function(e){return e.equip_action==="installed";}).length;
+          const removed=ins.filter(function(e){return e.equip_action==="removed";}).length;
+          return installed>removed;
+        });
+      }},
+      {l:"📦 3+ boxes",fn:function(){return DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});const tot=2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0);return tot>=3;});}},
+      {l:"🔶 Queen cells",fn:function(){return DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});}},
+      {l:"💪 Strong",fn:function(){return DB.hv.filter(function(h){return h.str==="Strong";});}},
+    ];
+    const activeQ=window._hiveFinder||null;
+    queries.forEach(function(q,i){
+      html+='<button onclick="window._hiveFinder='+(activeQ===i?"null":i)+';renderReports()" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(activeQ===i?"#3a7d44":"#eee9db")+';color:'+(activeQ===i?"#fff":"#3a7d44")+'">'+q.l+'</button>';
+    });
+    html+='</div>';
+    if(activeQ!==null&&queries[activeQ]){
+      const results=queries[activeQ].fn();
+      html+='<div style="margin-top:12px;font-size:14px;font-weight:700;color:#2d4a2d">'+results.length+' hives match:</div>';
+      if(results.length===0){html+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif;margin-top:4px">None found</div>';}
+      results.forEach(function(h){
+        const ap=getAp(h.ap);
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')">';
+        html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
+        html+='<div style="font-size:13px;color:#3a7d44;font-weight:700">Open →</div>';
+        html+='</div>';
+      });
+    }
+    html+='</div>';
+
   // ── WINTER SURVIVAL ───────────────────────────────────────────────────────
   } else if(repTab==="winter"){
     const yr=new Date().getFullYear();
@@ -2787,14 +2837,32 @@ function renderInspFields(){
   });
   html+='</div>';
 
-  // Boxes/frames added
-  html+='<label class="lbl">Boxes / Frames Added or Removed</label>';
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
-  [["log-boxes-added","Boxes added"],["log-frames-added","Frames added"]].forEach(function(r){
-    html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">'+r[1]+'</div>';
-    html+='<input type="number" id="'+r[0]+'" class="inp" style="margin:0;text-align:center" placeholder="0" min="-10" max="20"></div>';
-  });
+  // Boxes added with type
+  html+='<label class="lbl">Boxes Added / Removed</label>';
+  html+='<div style="margin-bottom:10px">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Count (+/-)</div>';
+  html+='<input type="number" id="log-boxes-added" class="inp" style="margin:0;text-align:center" placeholder="0" min="-5" max="10"></div>';
+  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Box type</div>';
+  html+='<select id="log-box-added-type" class="sel" style="margin:0">';
+  html+='<option value="medium">Medium super</option>';
+  html+='<option value="comb_super">🍯 Comb honey super</option>';
+  html+='<option value="shallow">Shallow super</option>';
+  html+='<option value="deep">Deep box</option>';
+  html+='<option value="nuc">Nuc box</option>';
+  html+='</select></div>';
   html+='</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Frames added</div>';
+  html+='<input type="number" id="log-frames-added" class="inp" style="margin:0;text-align:center" placeholder="0" min="-20" max="40"></div>';
+  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Frame type</div>';
+  html+='<select id="log-frame-added-type" class="sel" style="margin:0">';
+  html+='<option value="foundation">Foundation</option>';
+  html+='<option value="drawn">Drawn comb</option>';
+  html+='<option value="comb_honey">Comb honey</option>';
+  html+='<option value="drone">Drone foundation</option>';
+  html+='</select></div>';
+  html+='</div></div>';
 
   // Problems
   html+='<label class="lbl">Problems</label>';
@@ -2858,13 +2926,23 @@ async function saveLog(){
     ev.queen_seen=logQ;ev.str=logStr;ev.brood=logBrd;
     ev.eggs_seen=logEggs;
     ev.queen_cells=logQCells;
-    ev.boxes_added=document.getElementById("log-boxes-added")?document.getElementById("log-boxes-added").value||null:null;
-    ev.frames_added=document.getElementById("log-frames-added")?document.getElementById("log-frames-added").value||null:null;
+    const boxesAdded=document.getElementById("log-boxes-added")?parseInt(document.getElementById("log-boxes-added").value)||0:0;
+    const framesAdded=document.getElementById("log-frames-added")?parseInt(document.getElementById("log-frames-added").value)||0:0;
+    const boxType=document.getElementById("log-box-added-type")?document.getElementById("log-box-added-type").value:"";
+    const frameType=document.getElementById("log-frame-added-type")?document.getElementById("log-frame-added-type").value:"";
+    ev.boxes_added=boxesAdded||null;
+    ev.frames_added=framesAdded||null;
+    ev.box_type=boxesAdded?boxType:null;
     ev.problems=document.getElementById("log-problems")?document.getElementById("log-problems").value||null:null;
-    // Add problems to notes if filled
-    const prob=ev.problems;
-    if(prob&&!ev.notes)ev.notes=prob;
-    else if(prob&&ev.notes)ev.notes=ev.notes+" | Problems: "+prob;
+    // Build notes from box/frame additions
+    const parts=[];
+    if(boxesAdded>0)parts.push("Added "+boxesAdded+" "+boxType+" box"+(boxesAdded!==1?"es":""));
+    if(boxesAdded<0)parts.push("Removed "+Math.abs(boxesAdded)+" box"+(Math.abs(boxesAdded)!==1?"es":""));
+    if(framesAdded>0)parts.push("Added "+framesAdded+" "+frameType+" frame"+(framesAdded!==1?"s":""));
+    if(framesAdded<0)parts.push("Removed "+Math.abs(framesAdded)+" frame"+(Math.abs(framesAdded)!==1?"s":""));
+    if(ev.problems)parts.push("⚠️ "+ev.problems);
+    if(parts.length&&!ev.notes)ev.notes=parts.join(" · ");
+    else if(parts.length&&ev.notes)ev.notes=ev.notes+" | "+parts.join(" · ");
   }
   else if(logType==="feeding"){ev.feed_type=document.getElementById("log-feed-type").value;ev.amt=document.getElementById("log-amt").value;}
   else if(logType==="treatment"){ev.treat_type=document.getElementById("log-treat-type").value;ev.dur=document.getElementById("log-dur").value;}
