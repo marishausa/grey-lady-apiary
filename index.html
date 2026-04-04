@@ -68,7 +68,7 @@ a{text-decoration:none}
 .wind-warn{background:#6a3a10;border:1.5px solid rgba(240,160,64,.38);border-radius:10px;padding:8px 14px;margin-top:10px;font-size:14px;color:#f0c080;font-family:sans-serif;font-weight:600}
 .sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 .sc-card{background:#eee9db;border:1.5px solid #c8bc98;border-radius:14px;padding:14px 8px;text-align:center}
-.tab-bar{background:#2d4a2d;display:flex;padding:0 6px 8px;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:52px;z-index:99}
+.tab-bar{background:#2d4a2d;display:flex;padding:0 6px 8px;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:52px;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .tab-btn{flex-shrink:0;padding:10px 18px;background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#9dc89d;font-size:15px;font-weight:700;cursor:pointer;font-family:sans-serif;min-height:44px;-webkit-tap-highlight-color:rgba(0,0,0,.1)}
 .tab-btn.active{background:#c8f0c8;color:#1a2e1a}
 .filter-row{display:flex;gap:7px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
@@ -2695,7 +2695,14 @@ async function deleteEvent(id){
 }
 
 function setSelHvById(id){selHv=getHv(id);}
-function setRepTab(t){repTab=t;window._hiveFinderKey="";renderReports();}
+function setRepTab(t){
+  repTab=t;
+  window._hiveFinderKey="";
+  window._opsSub="overdue_insp";
+  window._feedSub="need";
+  window._healthSub="issues";
+  try{renderReports();}catch(e){console.error("renderReports crash:",e);alert("Tab error: "+e.message);}
+}
 function runHiveFinder(key){
   window._hiveFinderKey=window._hiveFinderKey===key?"":key;
   // Re-render the reports page
