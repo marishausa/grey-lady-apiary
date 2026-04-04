@@ -372,7 +372,7 @@ a{text-decoration:none}
     <input type="date" class="inp" id="edit-ev-date">
     <label class="lbl">Notes</label>
     <textarea class="textarea" id="edit-ev-notes" placeholder="Notes…"></textarea>
-    <label class="lbl">Source (installs only)</label>
+    <label class="lbl" id="edit-ev-source-label">Source (installs only)</label>
     <input class="inp" id="edit-ev-source" placeholder="e.g. Mountain Sweet Honey">
     <div style="display:flex;gap:10px;padding-bottom:20px;margin-top:4px">
       <button class="btn-big" style="background:#3a7d44;flex:2;margin-bottom:0" onclick="saveEditEvent()">✓ Save Changes</button>
@@ -2668,19 +2668,20 @@ async function saveEditTask(){
 let editingEventId=null;
 function editEvent(id){
   const ev=DB.ev.find(function(e){return e.id===id;});
-  if(!ev)return;
+  if(!ev){toast$("Entry not found",true);return;}
   editingEventId=id;
   document.getElementById("edit-ev-date").value=ev.date||"";
   document.getElementById("edit-ev-notes").value=ev.notes||"";
-  document.getElementById("edit-ev-source").value=ev.source||"";
-  // Show/hide source field based on type
-  const sourceRow=document.getElementById("edit-ev-source").parentElement;
+  const srcInput=document.getElementById("edit-ev-source");
+  const srcLabel=document.getElementById("edit-ev-source-label");
+  if(srcInput)srcInput.value=ev.source||"";
+  // Show source field only for installs
   if(ev.type==="install"){
-    sourceRow.style.display="block";
-    sourceRow.previousElementSibling.style.display="block";
+    if(srcInput)srcInput.style.display="block";
+    if(srcLabel)srcLabel.style.display="block";
   } else {
-    sourceRow.style.display="none";
-    sourceRow.previousElementSibling.style.display="none";
+    if(srcInput)srcInput.style.display="none";
+    if(srcLabel)srcLabel.style.display="none";
   }
   openModal("edit-event-modal");
 }
