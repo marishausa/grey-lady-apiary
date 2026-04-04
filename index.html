@@ -450,18 +450,29 @@ a{text-decoration:none}
         <input type="date" class="inp" id="log-jars-date">
       </div>
       <div id="log-equip-fields" style="display:none">
-        <label class="lbl">Equipment</label>
+        <label class="lbl">Equipment Type</label>
         <select class="sel" id="log-equip-type">
-          <option value="pollen_trap">🌼 Pollen Trap</option>
-          <option value="propolis_trap">🟤 Propolis Trap</option>
-          <option value="queen_excluder">👑 Queen Excluder</option>
+          <optgroup label="📦 Add/Remove Box">
+            <option value="box_medium">📦 Medium box</option>
+            <option value="box_deep">📦 Deep box</option>
+            <option value="box_shallow">📦 Shallow box</option>
+            <option value="box_winter">❄️ Winter box</option>
+            <option value="box_comb_super">🍯 Comb honey super</option>
+          </optgroup>
+          <optgroup label="🔧 Equipment">
+            <option value="queen_excluder">👑 Queen Excluder</option>
+            <option value="pollen_trap">🌼 Pollen Trap</option>
+            <option value="propolis_trap">🟤 Propolis Trap</option>
+          </optgroup>
         </select>
         <label class="lbl">Action</label>
         <div style="display:flex;gap:8px;margin-bottom:10px">
-          <button type="button" id="equip-install-btn" onclick="setEquipAction('installed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#3a7d44;border:2px solid #3a7d44;color:#fff">📥 Installed</button>
+          <button type="button" id="equip-install-btn" onclick="setEquipAction('installed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#3a7d44;border:2px solid #3a7d44;color:#fff">📥 Added/Installed</button>
           <button type="button" id="equip-remove-btn" onclick="setEquipAction('removed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#eee9db;border:2px solid #b83030;color:#b83030">📤 Removed</button>
         </div>
         <input type="hidden" id="log-equip-action" value="installed">
+        <label class="lbl" id="equip-position-label">Position in stack (1=bottom)</label>
+        <input type="number" class="inp" id="log-equip-position" placeholder="Leave blank for top" min="1" max="10">
       </div>
       <div id="log-install-fields" style="display:none">
         <label class="lbl">Breed</label>
@@ -1212,39 +1223,126 @@ function renderHive(){
     body+='</div>';
   }
 
-  // ── EQUIPMENT CARD ───────────────────────────────────────────────────────
-  const boxCount=h.box_count||2;
-  const boxTypes=h.box_types||"medium";
-  const bottomBoard=h.bottom_board||null;
-  const feeder=h.feeder||null;
-
+  // ── HIVE SUMMARY ─────────────────────────────────────────────────────────
   body+='<div class="card" style="margin-bottom:14px;background:#f0f7f0;border-left:4px solid #3a7d44">';
-  body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d;margin-bottom:12px">🪵 Hive Setup</div>';
-  // Box count
-  body+='<div style="margin-bottom:12px">';
-  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Boxes</div>';
-  body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
-  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(boxCount-1)+')" style="width:40px;height:40px;border-radius:10px;border:2px solid #c8bc98;background:#fff;font-size:22px;cursor:pointer;font-family:sans-serif">−</button>';
-  body+='<div style="font-size:28px;font-weight:800;color:#2d4a2d;min-width:40px;text-align:center">'+boxCount+'</div>';
-  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(boxCount+1)+')" style="width:40px;height:40px;border-radius:10px;border:2px solid #c8bc98;background:#fff;font-size:22px;cursor:pointer;font-family:sans-serif">+</button>';
+  body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d;margin-bottom:10px">📊 Hive Summary</div>';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:sans-serif;margin-bottom:10px">';
+  // Last inspection
+  if(li){
+    body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+    body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Inspection</div>';
+    body+='<div style="font-size:14px;font-weight:700;color:#1a2e1a">'+fmtD(li.date)+'</div>';
+    if(li.str)body+='<div style="font-size:12px;color:#3a7d44;font-weight:600">'+li.str+'</div>';
+    if(li.brood)body+='<div style="font-size:12px;color:#4a6040">'+li.brood+' brood</div>';
+    body+='</div>';
+  } else {
+    body+='<div style="background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Inspection</div><div style="font-size:14px;color:#b83030;font-weight:700">Never</div></div>';
+  }
+  // Last fed
+  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Fed</div>';
+  if(lf)body+='<div style="font-size:14px;font-weight:700;color:#b87820">'+dAgo(lf.date)+'</div><div style="font-size:12px;color:#4a6040">'+fmtD(lf.date)+'</div>';
+  else body+='<div style="font-size:14px;color:#b83030;font-weight:700">Never</div>';
   body+='</div>';
-  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  [{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter box"},{v:"medium+comb",l:"Medium + Comb super"},{v:"mixed",l:"Mixed"}].forEach(function(bt){
-    const sel=boxTypes===bt.v;
-    body+='<button onclick="setHvBoxTypes(\''+h.id+'\',\''+bt.v+'\')" style="padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(sel?"#3a7d44":"#fff")+';color:'+(sel?"#fff":"#3a7d44")+'">'+bt.l+'</button>';
+  // Queen status
+  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Queen</div>';
+  if(li&&li.queen_seen===true)body+='<div style="font-size:14px;font-weight:700;color:#3a7d44">👑 Seen</div>';
+  else if(li&&li.queen_seen===false)body+='<div style="font-size:14px;font-weight:700;color:#b83030">👑 Not seen</div>';
+  else body+='<div style="font-size:14px;color:#8a9e80">Unknown</div>';
+  if(li&&li.eggs_seen===true)body+='<div style="font-size:12px;color:#3a7d44">🥚 Eggs ✓</div>';
+  if(li&&li.capped_brood===true)body+='<div style="font-size:12px;color:#3a7d44">🍬 Capped brood ✓</div>';
+  if(li&&li.queen_cells===true)body+='<div style="font-size:12px;color:#b83030">🔶 Queen cells!</div>';
+  body+='</div>';
+  // Last treatment
+  body+='<div style="background:#fff;border-radius:8px;padding:8px">';
+  body+='<div style="font-size:11px;color:#8a9e80;text-transform:uppercase">Last Treated</div>';
+  if(lt)body+='<div style="font-size:14px;font-weight:700;color:#2060a0">'+dAgo(lt.date)+'</div>';
+  else body+='<div style="font-size:14px;color:#8a9e80">Never</div>';
+  body+='</div>';
+  body+='</div></div>';
+
+  // ── HIVE SETUP ───────────────────────────────────────────────────────────
+  // Boxes from equipment log events — each box add is an event
+  const boxEvts=evts.filter(function(e){return e.type==="equipment"&&e.equip_type&&e.equip_type.startsWith("box_");}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  // Starting boxes from hive record
+  const startBoxCount=h.box_count||2;
+  const startBoxType=h.box_types||"medium";
+  // Build current box stack from events
+  var boxStack=[];
+  // Add starting boxes
+  for(var bi=0;bi<startBoxCount;bi++){boxStack.push({type:startBoxType,date:installEv?installEv.date:"start",label:"Start of season"});}
+  // Apply add/remove events
+  boxEvts.forEach(function(e){
+    const btype=e.equip_type.replace("box_","");
+    if(e.equip_action==="installed")boxStack.push({type:btype,date:e.date,label:"Added "+fmtD(e.date)});
+    else if(e.equip_action==="removed")boxStack.pop();
+  });
+  // Equipment (non-box)
+  const equipEvts=evts.filter(function(e){return e.type==="equipment"&&e.equip_type&&!e.equip_type.startsWith("box_");});
+  const installedEquip={};
+  equipEvts.forEach(function(e){
+    if(e.equip_action==="installed")installedEquip[e.equip_type]=e.date;
+    else if(e.equip_action==="removed")delete installedEquip[e.equip_type];
+  });
+
+  body+='<div class="card" style="margin-bottom:14px;border-left:4px solid #b87820">';
+  body+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d">🪵 Hive Setup</div>';
+  body+='<button onclick="openLogModal({ap:\''+h.ap+'\',hv:\''+h.id+'\',etype:\'equipment\'})" style="padding:6px 14px;background:#b87820;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">+ Edit</button>';
+  body+='</div>';
+
+  // Box stack — visual tower from bottom to top
+  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Box Stack ('+boxStack.length+' boxes, bottom→top)</div>';
+  if(boxStack.length===0){
+    body+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif;margin-bottom:10px">No boxes recorded</div>';
+  } else {
+    const boxColors={medium:"#3a7d44",deep:"#2060a0",shallow:"#b87820",winter:"#6040a0","medium+comb":"#b06020",mixed:"#888"};
+    body+='<div style="margin-bottom:12px">';
+    boxStack.slice().reverse().forEach(function(box,idx){
+      const isNew=box.label!=="Start of season";
+      const col=boxColors[box.type]||"#888";
+      body+='<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:4px;border-radius:8px;background:'+(isNew?"#fff8f0":"#f5f1e8")+';border:2px solid '+col+'30">';
+      body+='<span style="font-size:11px;font-weight:700;color:#8a9e80;min-width:20px">'+(boxStack.length-idx)+'</span>';
+      body+='<span style="padding:3px 10px;border-radius:6px;background:'+col+';color:#fff;font-size:12px;font-weight:700">'+box.type+'</span>';
+      body+='<span style="font-size:12px;color:#8a9e80;font-family:sans-serif">'+(isNew?'➕ '+box.label:'Season start')+'</span>';
+      body+='</div>';
+    });
+    body+='</div>';
+  }
+
+  // Set starting boxes
+  body+='<div style="margin-bottom:12px;padding:10px;background:#f5f1e8;border-radius:10px">';
+  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;margin-bottom:8px;text-transform:uppercase">Starting Configuration</div>';
+  body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+  body+='<span style="font-size:13px;font-family:sans-serif;color:#4a6040">Boxes at start:</span>';
+  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount-1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">−</button>';
+  body+='<span style="font-size:18px;font-weight:800;color:#2d4a2d;min-width:24px;text-align:center">'+startBoxCount+'</span>';
+  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount+1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">+</button>';
+  body+='</div>';
+  body+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
+  [{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter"},{v:"mixed",l:"Mixed"}].forEach(function(bt){
+    const sel=startBoxType===bt.v;
+    body+='<button onclick="setHvBoxTypes(\''+h.id+'\',\''+bt.v+'\')" style="padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(sel?"#3a7d44":"#fff")+';color:'+(sel?"#fff":"#3a7d44")+'">'+bt.l+'</button>';
   });
   body+='</div></div>';
+
   // Bottom board
+  const bbL={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen board"};
+  const bottomBoard=h.bottom_board||null;
   body+='<div style="margin-bottom:12px">';
   body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Bottom Board</div>';
   body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  [{v:"solid",l:"🪵 Solid"},{v:"screened",l:"🔲 Screened"},{v:"pollen",l:"🌼 Pollen trap board"}].forEach(function(bb){
+  [{v:"solid",l:"🪵 Solid"},{v:"screened",l:"🔲 Screened"},{v:"pollen",l:"🌼 Pollen board"}].forEach(function(bb){
     const sel=bottomBoard===bb.v;
     body+='<button onclick="setHvField(\''+h.id+'\',\'bottom_board\',\''+bb.v+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #b87820;background:'+(sel?"#b87820":"#fff")+';color:'+(sel?"#fff":"#b87820")+'">'+bb.l+'</button>';
   });
-  if(bottomBoard)body+='<button onclick="setHvField(\''+h.id+'\',\'bottom_board\',null)" style="padding:8px 12px;border-radius:10px;font-size:12px;cursor:pointer;font-family:sans-serif;border:2px solid #c8bc98;background:#fff;color:#8a9e80">Clear</button>';
+  if(bottomBoard)body+='<button onclick="setHvField(\''+h.id+'\',\'bottom_board\',null)" style="padding:8px 10px;border-radius:10px;font-size:12px;cursor:pointer;font-family:sans-serif;border:2px solid #c8bc98;background:#fff;color:#8a9e80">✕</button>';
   body+='</div></div>';
+
   // Feeder
+  const feeder=h.feeder||null;
+  const fL={inner:"🍯 Inner",top:"🍯 Top",yellow_top:"🟡 Yellow top"};
   body+='<div style="margin-bottom:10px">';
   body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Feeder</div>';
   body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
@@ -1253,12 +1351,18 @@ function renderHive(){
     body+='<button onclick="setHvField(\''+h.id+'\',\'feeder\',\''+f.v+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #2060a0;background:'+(sel?"#2060a0":"#fff")+';color:'+(sel?"#fff":"#2060a0")+'">'+f.l+'</button>';
   });
   body+='</div></div>';
-  // Summary badges
-  body+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #c8bc98">';
-  body+='<span class="pill" style="background:#3a7d4420;border:1.5px solid #3a7d4450;color:#2d4a2d;font-weight:800">📦 '+boxCount+' '+(boxTypes||"medium")+'</span>';
-  if(bottomBoard){const bbL={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen board"};body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">'+(bbL[bottomBoard]||bottomBoard)+'</span>';}
-  if(feeder&&feeder!=="none"){const fL={inner:"🍯 Inner feeder",top:"🍯 Top feeder",yellow_top:"🟡 Yellow top feeder"};body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(fL[feeder]||feeder)+'</span>';}
-  body+='</div></div>';
+
+  // Active equipment badges
+  const equipNames={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder"};
+  const activeEquipKeys=Object.keys(installedEquip);
+  if(activeEquipKeys.length>0||bottomBoard||feeder){
+    body+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #c8bc98">';
+    if(bottomBoard)body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">'+(bbL[bottomBoard]||bottomBoard)+'</span>';
+    if(feeder&&feeder!=="none")body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(fL[feeder]||feeder)+' feeder</span>';
+    activeEquipKeys.forEach(function(k){body+='<span class="pill" style="background:#8040a020;border:1.5px solid #8040a050;color:#8040a0">'+(equipNames[k]||k)+'</span>';});
+    body+='</div>';
+  }
+  body+='</div>';
 
   // ── QUICK STATS ───────────────────────────────────────────────────────────
   body+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">';
@@ -3028,8 +3132,11 @@ async function saveLog(){
   else if(logType==="equipment"){
     ev.equip_type=document.getElementById("log-equip-type").value;
     ev.equip_action=document.getElementById("log-equip-action").value;
-    const equipNames={pollen_trap:"Pollen trap",propolis_trap:"Propolis trap",queen_excluder:"Queen excluder"};
-    if(!ev.notes)ev.notes=(ev.equip_action==="installed"?"Installed":"Removed")+" "+(equipNames[ev.equip_type]||ev.equip_type);
+    ev.equip_position=document.getElementById("log-equip-position")?parseInt(document.getElementById("log-equip-position").value)||null:null;
+    const isBox=ev.equip_type.startsWith("box_");
+    const equipNames={queen_excluder:"Queen excluder",pollen_trap:"Pollen trap",propolis_trap:"Propolis trap",box_medium:"Medium box",box_deep:"Deep box",box_shallow:"Shallow box",box_winter:"Winter box",box_comb_super:"Comb honey super"};
+    const actionWord=ev.equip_action==="installed"?(isBox?"Added":"Installed"):"Removed";
+    if(!ev.notes)ev.notes=actionWord+" "+(equipNames[ev.equip_type]||ev.equip_type)+(ev.equip_position?" at position "+ev.equip_position:"");
   }
 
   const ok = await SB.addEvent(ev);
