@@ -1395,35 +1395,20 @@ function renderHive(){
   body+='<label style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Feeder</label>';
   body+='<select onchange="setHvField(\''+h.id+'\',\'feeder\',this.value||null)" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #c8bc98;font-size:14px;font-family:sans-serif;background:#fff">';
   body+='<option value="">— None —</option>';
-  [{v:"inner_1gal",l:"🍯 Inner feeder — 1 gal"},{v:"top_2gal",l:"🍯 Top feeder — 2 gal"},{v:"yellow_top_1gal",l:"🟡 Yellow top feeder — 1 gal"},{v:"black_lg_4gal",l:"⬛ Black large feeder — 4 gal"},{v:"none",l:"No feeder"}].forEach(function(f){
+  [{v:"inner_1gal",l:"🍯 Inner feeder — 1 gal"},{v:"top_2gal",l:"🍯 Top feeder — 2 gal"},{v:"yellow_top_1gal",l:"🟡 Yellow top feeder — 1 gal"},{v:"black_lg_4gal",l:"⬛ Black large feeder — 4 gal"}].forEach(function(f){
     body+='<option value="'+f.v+'"'+(feeder===f.v?" selected":"")+'>'+f.l+'</option>';
   });
   body+='</select></div>';
-  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  [{v:"inner_1gal",l:"🍯 Inner — 1 gal"},{v:"top_2gal",l:"🍯 Top — 2 gal"},{v:"yellow_top_1gal",l:"🟡 Yellow top — 1 gal"},{v:"black_lg_4gal",l:"⬛ Black — 4 gal"},{v:"none",l:"No feeder"}].forEach(function(f){
-    const sel=feeder===f.v;
-    body+='<option value="'+f.v+'"'+(sel?" selected":"")+'>'+f.l+'</option>';
-  });
 
-  // Active equipment badges
-  const feederLabels={inner_1gal:"🍯 Inner 1gal",top_2gal:"🍯 Top 2gal",yellow_top_1gal:"🟡 Yellow top 1gal",black_lg_4gal:"⬛ Black 4gal"};
-  const bbLabels2={solid:"🪵 Solid board",screened:"🔲 Screened board",pollen:"🌼 Pollen board"};
+  // Show active equipment (pollen trap, queen excluder etc) as badges only — not bottom board/feeder which are already shown above
   const equipNames={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder"};
   const activeEquipKeys=Object.keys(installedEquip);
-  if(activeEquipKeys.length>0||bottomBoard||feeder){
-    body+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #c8bc98">';
-    if(bottomBoard)body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">'+(bbLabels2[bottomBoard]||bottomBoard)+'</span>';
-    if(feeder&&feeder!=="none")body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(feederLabels[feeder]||feeder)+'</span>';
+  if(activeEquipKeys.length>0){
+    body+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #eee9db;margin-top:4px">';
+    body+='<span style="font-size:12px;color:#8a9e80;font-family:sans-serif">Active equipment:</span>';
     activeEquipKeys.forEach(function(k){body+='<span class="pill" style="background:#8040a020;border:1.5px solid #8040a050;color:#8040a0">'+(equipNames[k]||k)+'</span>';});
     body+='</div>';
   }
-  body+='</div>';
-
-  // ── QUICK STATS ───────────────────────────────────────────────────────────
-  body+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">';
-  [[li,"🔍","Inspect","#3a7d44"],[lf,"🍯","Feed","#b87820"],[lt,"💊","Treat","#2060a0"]].forEach(function(row){
-    body+='<div class="sc-card"><div style="font-size:18px">'+row[1]+'</div><div style="font-size:13px;font-weight:700;color:'+row[3]+';font-family:sans-serif">'+(row[0]?dAgo(row[0].date):"Never")+'</div><div style="font-size:10px;color:#4a6040;font-family:sans-serif;text-transform:uppercase">'+row[2]+'</div></div>';
-  });
   body+='</div>';
 
   // ── QUICK LOG BUTTONS ─────────────────────────────────────────────────────
