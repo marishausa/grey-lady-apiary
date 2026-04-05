@@ -1278,9 +1278,20 @@ function renderHive(){
   const boxInspEvts=evts.filter(function(e){return e.type==="inspection"&&e.boxes_added&&parseInt(e.boxes_added)!==0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
   const startBoxCount=h.box_count||2;
   const startBoxType=h.box_types||"medium";
+  // Parse box_types — could be JSON array ["winter","medium","medium"] or simple string
+  var startBoxArr2=[];
+  try{
+    if(h.box_types&&h.box_types.startsWith("["))startBoxArr2=JSON.parse(h.box_types);
+    else{for(var bi2=0;bi2<startBoxCount;bi2++)startBoxArr2.push(h.box_types||"medium");}
+  }catch(ex){for(var bi3=0;bi3<startBoxCount;bi3++)startBoxArr2.push("medium");}
+  while(startBoxArr2.length<startBoxCount)startBoxArr2.push("medium");
+  startBoxArr2=startBoxArr2.slice(0,startBoxCount);
+
   // Build current box stack
   var boxStack=[];
-  for(var bi=0;bi<startBoxCount;bi++){boxStack.push({type:startBoxType,date:installEv?installEv.date:"start",label:"Season start"});}
+  startBoxArr2.forEach(function(btype,idx){
+    boxStack.push({type:btype,date:installEv?installEv.date:"start",label:"Season start"});
+  });
   // Merge equipment and inspection box events by date
   var allBoxChanges=[];
   boxEquipEvts.forEach(function(e){allBoxChanges.push({date:e.date,type:e.equip_type.replace("box_",""),action:e.equip_action,label:fmtD(e.date)+' (equipment log)' });});
@@ -1332,21 +1343,42 @@ function renderHive(){
     body+='</div>';
   }
 
-  // Set starting boxes
+  // Set starting boxes — each box individually
+  // Parse box_types as JSON array, fallback to array of same type
+  var startBoxArr=[];
+  try{
+    if(h.box_types&&h.box_types.startsWith("["))startBoxArr=JSON.parse(h.box_types);
+    else{for(var si=0;si<startBoxCount;si++)startBoxArr.push(h.box_types||"medium");}
+  }catch(e){for(var si2=0;si2<startBoxCount;si2++)startBoxArr.push("medium");}
+  // Sync length with count
+  while(startBoxArr.length<startBoxCount)startBoxArr.push("medium");
+  startBoxArr=startBoxArr.slice(0,startBoxCount);
+
   body+='<div style="margin-bottom:12px;padding:10px;background:#f5f1e8;border-radius:10px">';
-  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;margin-bottom:8px;text-transform:uppercase">Starting Configuration</div>';
-  body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-  body+='<span style="font-size:13px;font-family:sans-serif;color:#4a6040">Boxes at start:</span>';
+  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;margin-bottom:8px;text-transform:uppercase">Starting Box Configuration (bottom → top)</div>';
+  // Count buttons
+  body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+  body+='<span style="font-size:13px;font-family:sans-serif;color:#4a6040">Number of starting boxes:</span>';
   body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount-1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">−</button>';
   body+='<span style="font-size:18px;font-weight:800;color:#2d4a2d;min-width:24px;text-align:center">'+startBoxCount+'</span>';
   body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount+1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">+</button>';
   body+='</div>';
-  body+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
-  [{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter"},{v:"mixed",l:"Mixed"}].forEach(function(bt){
-    const sel=startBoxType===bt.v;
-    body+='<button onclick="setHvBoxTypes(\''+h.id+'\',\''+bt.v+'\')" style="padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #3a7d44;background:'+(sel?"#3a7d44":"#fff")+';color:'+(sel?"#fff":"#3a7d44")+'">'+bt.l+'</button>';
+  // Per-box type selector
+  var boxTypeOpts=[{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter"},{v:"comb_super",l:"🍯 Comb super"}];
+  var boxColors2={medium:"#3a7d44",deep:"#2060a0",shallow:"#b87820",winter:"#6040a0",comb_super:"#b06020"};
+  startBoxArr.forEach(function(btype,idx){
+    var col=boxColors2[btype]||"#888";
+    body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+    body+='<span style="font-size:12px;font-weight:700;color:#8a9e80;min-width:55px">Box '+(idx+1)+(idx===0?" (btm)":idx===startBoxArr.length-1?" (top)":"")+'</span>';
+    body+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    boxTypeOpts.forEach(function(opt){
+      var sel=btype===opt.v;
+      var c=boxColors2[opt.v]||"#888";
+      body+='<button onclick="setHvBoxType(\''+h.id+'\','+idx+',\''+opt.v+'\')" style="padding:4px 8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid '+c+';background:'+(sel?c:"#fff")+';color:'+(sel?"#fff":c)+'">'+opt.l+'</button>';
+    });
+    body+='</div></div>';
   });
-  body+='</div></div>';
+  body+='</div>';
 
   // Bottom board
   const bbL={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen board"};
@@ -1470,6 +1502,25 @@ function renderHive(){
   document.getElementById("hive-body").innerHTML=body;
 }
 
+async function setHvBoxType(hid,idx,val){
+  // Get current array
+  const h=DB.hv.find(function(x){return x.id===hid;});
+  if(!h)return;
+  const cnt=h.box_count||2;
+  var arr=[];
+  try{
+    if(h.box_types&&h.box_types.startsWith("["))arr=JSON.parse(h.box_types);
+    else{for(var i=0;i<cnt;i++)arr.push(h.box_types||"medium");}
+  }catch(e){for(var i2=0;i2<cnt;i2++)arr.push("medium");}
+  while(arr.length<cnt)arr.push("medium");
+  arr=arr.slice(0,cnt);
+  arr[idx]=val;
+  const newVal=JSON.stringify(arr);
+  await SB.updateHive(hid,{box_types:newVal});
+  DB.hv=DB.hv.map(function(x){return x.id!==hid?x:Object.assign({},x,{box_types:newVal});});
+  renderHive();
+  toast$("Box "+(idx+1)+" → "+val+" ✓");
+}
 async function setHvBoxCount(hid,val){
   val=Math.max(1,Math.min(10,parseInt(val)||1));
   await SB.updateHive(hid,{box_count:val});
