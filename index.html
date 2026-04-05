@@ -611,27 +611,35 @@ const SB = {
       eggs_seen: ev.eggs_seen !== undefined ? ev.eggs_seen : null,
       queen_cells: ev.queen_cells !== undefined ? ev.queen_cells : null,
       capped_brood: ev.capped_brood !== undefined ? ev.capped_brood : null,
-      strength: ev.str || null, brood: ev.brood || null,
-      boxes_added: ev.boxes_added ? parseInt(ev.boxes_added) : null,
-      frames_added: ev.frames_added ? parseInt(ev.frames_added) : null,
-      problems: ev.problems || null,
-      feed_type: ev.feed_type || null, amount: ev.amt || null,
-      treat_type: ev.treat_type || null, duration: ev.dur || null,
+      strength: ev.str || null,
+      brood: ev.brood || null,
+      feed_type: ev.feed_type || null,
+      amount: ev.amt || null,
+      treat_type: ev.treat_type || null,
+      duration: ev.dur || null,
       lbs: ev.lbs ? parseFloat(ev.lbs) : null,
-      frames: ev.frames ? parseInt(ev.frames) : null,
-      frames_comb: ev.frames_comb ? parseInt(ev.frames_comb) : null,
-      box_type: ev.box_type || null,
-      jars: ev.jars ? parseInt(ev.jars) : null,
-      jar_size: ev.jar_size || null,
-      jars_date: ev.jars_date || null,
-      breed: ev.breed || null, source: ev.source || null,
-      swarm_type: ev.swarm_type || null,
-      swarm_dest: ev.swarm_dest || null,
+      breed: ev.breed || null,
+      source: ev.source || null,
       equip_type: ev.equip_type || null,
       equip_action: ev.equip_action || null,
     };
+    // Add optional columns only if they have values (avoids missing column errors)
+    if(ev.boxes_added)row.boxes_added=parseInt(ev.boxes_added);
+    if(ev.frames_added)row.frames_added=parseInt(ev.frames_added);
+    if(ev.problems)row.problems=ev.problems;
+    if(ev.frames)row.frames=parseInt(ev.frames);
+    if(ev.frames_comb)row.frames_comb=parseInt(ev.frames_comb);
+    if(ev.box_type)row.box_type=ev.box_type;
+    if(ev.jars)row.jars=parseInt(ev.jars);
+    if(ev.jar_size)row.jar_size=ev.jar_size;
+    if(ev.jars_date)row.jars_date=ev.jars_date;
+    if(ev.swarm_type)row.swarm_type=ev.swarm_type;
+    if(ev.swarm_dest)row.swarm_dest=ev.swarm_dest;
     const {error} = await supa.from('events').insert(row);
-    if (error) console.error('addEvent error:', error);
+    if (error) {
+      console.error('addEvent error:', error.message, error.details, error.hint, JSON.stringify(row));
+      alert('Save error: ' + error.message + '\n' + (error.details||''));
+    }
     return !error;
   },
 
@@ -1264,19 +1272,32 @@ function renderHive(){
 
   // ── HIVE SETUP ───────────────────────────────────────────────────────────
   // Boxes from equipment log events — each box add is an event
-  const boxEvts=evts.filter(function(e){return e.type==="equipment"&&e.equip_type&&e.equip_type.startsWith("box_");}).sort(function(a,b){return a.date.localeCompare(b.date);});
-  // Starting boxes from hive record
+  // ── BOX TRACKING ─────────────────────────────────────────────────────────
+  // Boxes from equipment log (box_ prefix) AND inspection boxes_added field
+  const boxEquipEvts=evts.filter(function(e){return e.type==="equipment"&&e.equip_type&&e.equip_type.startsWith("box_");}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  const boxInspEvts=evts.filter(function(e){return e.type==="inspection"&&e.boxes_added&&parseInt(e.boxes_added)!==0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
   const startBoxCount=h.box_count||2;
   const startBoxType=h.box_types||"medium";
-  // Build current box stack from events
+  // Build current box stack
   var boxStack=[];
-  // Add starting boxes
-  for(var bi=0;bi<startBoxCount;bi++){boxStack.push({type:startBoxType,date:installEv?installEv.date:"start",label:"Start of season"});}
-  // Apply add/remove events
-  boxEvts.forEach(function(e){
-    const btype=e.equip_type.replace("box_","");
-    if(e.equip_action==="installed")boxStack.push({type:btype,date:e.date,label:"Added "+fmtD(e.date)});
-    else if(e.equip_action==="removed")boxStack.pop();
+  for(var bi=0;bi<startBoxCount;bi++){boxStack.push({type:startBoxType,date:installEv?installEv.date:"start",label:"Season start"});}
+  // Merge equipment and inspection box events by date
+  var allBoxChanges=[];
+  boxEquipEvts.forEach(function(e){allBoxChanges.push({date:e.date,type:e.equip_type.replace("box_",""),action:e.equip_action,label:fmtD(e.date)+' (equipment log)' });});
+  boxInspEvts.forEach(function(e){
+    var n=parseInt(e.boxes_added||0);
+    var btype=e.box_type||startBoxType;
+    allBoxChanges.push({date:e.date,type:btype,action:n>0?"installed":"removed",count:Math.abs(n),label:fmtD(e.date)+' (inspection)'});
+  });
+  allBoxChanges.sort(function(a,b){return a.date.localeCompare(b.date);});
+  allBoxChanges.forEach(function(e){
+    if(e.action==="installed"){
+      var cnt=e.count||1;
+      for(var ci=0;ci<cnt;ci++)boxStack.push({type:e.type,date:e.date,label:"Added "+e.label});
+    } else if(e.action==="removed"){
+      var cnt2=e.count||1;
+      for(var ci2=0;ci2<cnt2;ci2++){if(boxStack.length>0)boxStack.pop();}
+    }
   });
   // Equipment (non-box)
   const equipEvts=evts.filter(function(e){return e.type==="equipment"&&e.equip_type&&!e.equip_type.startsWith("box_");});
@@ -2993,32 +3014,19 @@ function renderInspFields(){
   });
   html+='</div>';
 
-  // Boxes added with type
+  // Boxes added during inspection
   html+='<label class="lbl">Boxes Added / Removed</label>';
-  html+='<div style="margin-bottom:10px">';
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
-  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Count (+/-)</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Count (+/−)</div>';
   html+='<input type="number" id="log-boxes-added" class="inp" style="margin:0;text-align:center" placeholder="0" min="-5" max="10"></div>';
   html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Box type</div>';
   html+='<select id="log-box-added-type" class="sel" style="margin:0">';
-  html+='<option value="medium">Medium super</option>';
+  html+='<option value="medium">Medium</option>';
   html+='<option value="comb_super">🍯 Comb honey super</option>';
-  html+='<option value="shallow">Shallow super</option>';
-  html+='<option value="deep">Deep box</option>';
-  html+='<option value="nuc">Nuc box</option>';
-  html+='</select></div>';
-  html+='</div>';
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Frames added</div>';
-  html+='<input type="number" id="log-frames-added" class="inp" style="margin:0;text-align:center" placeholder="0" min="-20" max="40"></div>';
-  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Frame type</div>';
-  html+='<select id="log-frame-added-type" class="sel" style="margin:0">';
-  html+='<option value="foundation">Foundation</option>';
-  html+='<option value="drawn">Drawn comb</option>';
-  html+='<option value="comb_honey">Comb honey</option>';
-  html+='<option value="drone">Drone foundation</option>';
-  html+='</select></div>';
-  html+='</div></div>';
+  html+='<option value="shallow">Shallow</option>';
+  html+='<option value="deep">Deep</option>';
+  html+='<option value="winter">❄️ Winter</option>';
+  html+='</select></div></div>';
 
   // Problems
   html+='<label class="lbl">Problems</label>';
@@ -3085,19 +3093,12 @@ async function saveLog(){
     ev.queen_cells=logQCells;
     ev.capped_brood=logCappedBrood;
     const boxesAdded=document.getElementById("log-boxes-added")?parseInt(document.getElementById("log-boxes-added").value)||0:0;
-    const framesAdded=document.getElementById("log-frames-added")?parseInt(document.getElementById("log-frames-added").value)||0:0;
-    const boxType=document.getElementById("log-box-added-type")?document.getElementById("log-box-added-type").value:"";
-    const frameType=document.getElementById("log-frame-added-type")?document.getElementById("log-frame-added-type").value:"";
-    ev.boxes_added=boxesAdded||null;
-    ev.frames_added=framesAdded||null;
-    ev.box_type=boxesAdded?boxType:null;
+    const boxType=document.getElementById("log-box-added-type")?document.getElementById("log-box-added-type").value:"medium";
+    if(boxesAdded){ev.boxes_added=boxesAdded;ev.box_type=boxType;}
     ev.problems=document.getElementById("log-problems")?document.getElementById("log-problems").value||null:null;
-    // Build notes from box/frame additions
     const parts=[];
     if(boxesAdded>0)parts.push("Added "+boxesAdded+" "+boxType+" box"+(boxesAdded!==1?"es":""));
     if(boxesAdded<0)parts.push("Removed "+Math.abs(boxesAdded)+" box"+(Math.abs(boxesAdded)!==1?"es":""));
-    if(framesAdded>0)parts.push("Added "+framesAdded+" "+frameType+" frame"+(framesAdded!==1?"s":""));
-    if(framesAdded<0)parts.push("Removed "+Math.abs(framesAdded)+" frame"+(Math.abs(framesAdded)!==1?"s":""));
     if(ev.problems)parts.push("⚠️ "+ev.problems);
     if(parts.length&&!ev.notes)ev.notes=parts.join(" · ");
     else if(parts.length&&ev.notes)ev.notes=ev.notes+" | "+parts.join(" · ");
@@ -3140,7 +3141,7 @@ async function saveLog(){
   }
 
   const ok = await SB.addEvent(ev);
-  if(!ok){toast$("Save failed — check connection",true);return;}
+  if(!ok){toast$("Save failed — check connection",true);console.error("Failed event:",JSON.stringify(ev));return;}
 
   ev.ts = new Date().toISOString();
   DB.ev.unshift(ev);
