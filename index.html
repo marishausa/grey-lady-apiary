@@ -1324,58 +1324,53 @@ function renderHive(){
   body+='<button onclick="openLogModal({ap:\''+h.ap+'\',hv:\''+h.id+'\',etype:\'equipment\'})" style="padding:6px 14px;background:#b87820;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">+ Edit</button>';
   body+='</div>';
 
-  // Box stack — visual tower from bottom to top
-  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Box Stack ('+boxStack.length+' boxes, bottom→top)</div>';
-  if(boxStack.length===0){
-    body+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif;margin-bottom:10px">No boxes recorded</div>';
-  } else {
-    const boxColors={medium:"#3a7d44",deep:"#2060a0",shallow:"#b87820",winter:"#6040a0","medium+comb":"#b06020",mixed:"#888"};
-    body+='<div style="margin-bottom:12px">';
-    boxStack.slice().reverse().forEach(function(box,idx){
-      const isNew=box.label!=="Start of season";
-      const col=boxColors[box.type]||"#888";
-      body+='<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:4px;border-radius:8px;background:'+(isNew?"#fff8f0":"#f5f1e8")+';border:2px solid '+col+'30">';
-      body+='<span style="font-size:11px;font-weight:700;color:#8a9e80;min-width:20px">'+(boxStack.length-idx)+'</span>';
-      body+='<span style="padding:3px 10px;border-radius:6px;background:'+col+';color:#fff;font-size:12px;font-weight:700">'+box.type+'</span>';
-      body+='<span style="font-size:12px;color:#8a9e80;font-family:sans-serif">'+(isNew?'➕ '+box.label:'Season start')+'</span>';
-      body+='</div>';
-    });
-    body+='</div>';
-  }
-
-  // Set starting boxes — each box individually
-  // Parse box_types as JSON array, fallback to array of same type
+  // Parse startBoxArr for dropdowns
   var startBoxArr=[];
   try{
     if(h.box_types&&h.box_types.startsWith("["))startBoxArr=JSON.parse(h.box_types);
     else{for(var si=0;si<startBoxCount;si++)startBoxArr.push(h.box_types||"medium");}
   }catch(e){for(var si2=0;si2<startBoxCount;si2++)startBoxArr.push("medium");}
-  // Sync length with count
   while(startBoxArr.length<startBoxCount)startBoxArr.push("medium");
   startBoxArr=startBoxArr.slice(0,startBoxCount);
 
-  body+='<div style="margin-bottom:12px;padding:10px;background:#f5f1e8;border-radius:10px">';
-  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;margin-bottom:8px;text-transform:uppercase">Starting Box Configuration (bottom → top)</div>';
-  // Count buttons
-  body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-  body+='<span style="font-size:13px;font-family:sans-serif;color:#4a6040">Number of starting boxes:</span>';
-  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount-1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">−</button>';
-  body+='<span style="font-size:18px;font-weight:800;color:#2d4a2d;min-width:24px;text-align:center">'+startBoxCount+'</span>';
-  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount+1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">+</button>';
-  body+='</div>';
-  // Per-box dropdown
+  // ── UNIFIED BOX STACK ────────────────────────────────────────────────────
+  // One section: each row shows box number + type dropdown + "added on" date if mid-season
   var boxTypeOpts=[{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter"},{v:"comb_super",l:"🍯 Comb honey super"}];
-  startBoxArr.forEach(function(btype,idx){
-    var label="Box "+(idx+1)+(idx===0?" (bottom)":idx===startBoxArr.length-1?" (top)":"");
-    body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
-    body+='<span style="font-size:13px;font-family:sans-serif;color:#4a6040;min-width:80px">'+label+'</span>';
-    body+='<select onchange="setHvBoxType(\''+h.id+'\','+idx+',this.value)" style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid #c8bc98;font-size:14px;font-family:sans-serif;background:#fff">';
-    boxTypeOpts.forEach(function(opt){
-      body+='<option value="'+opt.v+'"'+(btype===opt.v?" selected":"")+'>'+opt.l+'</option>';
-    });
-    body+='</select></div>';
-  });
+  var boxColors={medium:"#3a7d44",deep:"#2060a0",shallow:"#b87820",winter:"#6040a0",comb_super:"#b06020",mixed:"#888"};
+
+  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Boxes ('+boxStack.length+' total, bottom → top)</div>';
+  // Count controls
+  body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+  body+='<span style="font-size:13px;font-family:sans-serif;color:#4a6040">Starting boxes:</span>';
+  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount-1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">−</button>';
+  body+='<span style="font-size:16px;font-weight:800;color:#2d4a2d;min-width:20px;text-align:center">'+startBoxCount+'</span>';
+  body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount+1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">+</button>';
+  if(boxStack.length>startBoxCount)body+='<span style="font-size:12px;color:#b06020;font-family:sans-serif">+ '+(boxStack.length-startBoxCount)+' added mid-season</span>';
   body+='</div>';
+  // Each box as a row — starting boxes get dropdown, mid-season boxes show as read-only with date
+  boxStack.slice().reverse().forEach(function(box,idx){
+    var pos=boxStack.length-idx; // 1=bottom
+    var isStart=box.label==="Season start";
+    var col=boxColors[box.type]||"#888";
+    var posLabel=pos===1?"(bottom)":pos===boxStack.length?"(top)":"";
+    body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+    body+='<span style="font-size:12px;font-weight:700;color:#8a9e80;min-width:48px">Box '+pos+' '+posLabel+'</span>';
+    if(isStart){
+      // Starting box — editable dropdown
+      var arrIdx=pos-1; // index from bottom
+      body+='<select onchange="setHvBoxType(\''+h.id+'\','+arrIdx+',this.value)" style="flex:1;padding:7px 10px;border-radius:8px;border:2px solid '+col+'40;font-size:13px;font-family:sans-serif;background:#fff">';
+      boxTypeOpts.forEach(function(opt){
+        body+='<option value="'+opt.v+'"'+(box.type===opt.v?" selected":"")+'>'+opt.l+'</option>';
+      });
+      body+='</select>';
+    } else {
+      // Mid-season addition — read only with date badge
+      body+='<span style="flex:1;padding:7px 10px;border-radius:8px;background:'+col+'15;border:2px solid '+col+'40;font-size:13px;font-weight:700;color:'+col+'">'+box.type+'</span>';
+      body+='<span style="font-size:11px;color:#b06020;font-family:sans-serif">➕ '+box.label+'</span>';
+    }
+    body+='</div>';
+  });
+  if(boxStack.length===0)body+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif;margin-bottom:8px">No boxes set</div>';
 
   // Bottom board — dropdown
   const bbL={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen trap board"};
