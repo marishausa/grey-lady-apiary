@@ -851,10 +851,38 @@ function isOD(d){return d&&d<today();}
 function getAp(id){return DB.ap.find(function(a){return a.id===id;});}
 function getHv(id){return DB.hv.find(function(h){return h.id===id;});}
 function apTk(aid){return DB.tk.filter(function(t){return t.ap===aid&&t.status==="open";});}
-function hvTk(hid){return DB.tk.filter(function(t){return t.hv===hid&&t.status==="open";});}
+function hvTk(hid){
+  const h=DB.hv.find(function(x){return x.id===hid;});
+  const apId=h?h.ap:null;
+  return DB.tk.filter(function(t){
+    if(t.status!=="open")return false;
+    if(t.hv===hid)return true;
+    if(apId&&t.ap===apId&&!t.hv)return true;
+    return false;
+  });
+}
 function apEv(aid){return DB.ev.filter(function(e){return e.ap===aid;}).sort(function(a,b){return b.date.localeCompare(a.date);});}
-function hvEv(hid){return DB.ev.filter(function(e){return e.hv===hid;}).sort(function(a,b){return b.date.localeCompare(a.date);});}
-function lastEv(hid,type){return DB.ev.filter(function(e){return e.hv===hid&&e.type===type;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];}
+function hvEv(hid){
+  const h=DB.hv.find(function(x){return x.id===hid;});
+  const apId=h?h.ap:null;
+  return DB.ev.filter(function(e){
+    // Include events specifically for this hive
+    if(e.hv===hid)return true;
+    // Include apiary-level events (all hives) for this hive's apiary
+    if(apId&&e.ap===apId&&!e.hv)return true;
+    return false;
+  }).sort(function(a,b){return b.date.localeCompare(a.date);});
+}
+function lastEv(hid,type){
+  const h=DB.hv.find(function(x){return x.id===hid;});
+  const apId=h?h.ap:null;
+  return DB.ev.filter(function(e){
+    if(e.type!==type)return false;
+    if(e.hv===hid)return true;
+    if(apId&&e.ap===apId&&!e.hv)return true;
+    return false;
+  }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+}
 function openTasks(){return DB.tk.filter(function(t){return t.status==="open";});}
 
 function toast$(msg,err){
@@ -1197,7 +1225,7 @@ function renderHive(){
   document.getElementById("hive-hero").innerHTML=hero;
 
   const evts=hvEv(h.id).sort(function(a,b){return b.date.localeCompare(a.date);});
-  const tasks=DB.tk.filter(function(t){return t.hv===h.id&&t.status==="open";});
+  const tasks=hvTk(h.id);
   const li=lastEv(h.id,"inspection");
   const lf=lastEv(h.id,"feeding");
   const lt=lastEv(h.id,"treatment");
