@@ -452,27 +452,19 @@ a{text-decoration:none}
       <div id="log-equip-fields" style="display:none">
         <label class="lbl">Equipment Type</label>
         <select class="sel" id="log-equip-type">
-          <optgroup label="📦 Add/Remove Box">
-            <option value="box_medium">📦 Medium box</option>
-            <option value="box_deep">📦 Deep box</option>
-            <option value="box_shallow">📦 Shallow box</option>
-            <option value="box_winter">❄️ Winter box</option>
-            <option value="box_comb_super">🍯 Comb honey super</option>
-          </optgroup>
-          <optgroup label="🔧 Equipment">
-            <option value="queen_excluder">👑 Queen Excluder</option>
-            <option value="pollen_trap">🌼 Pollen Trap</option>
-            <option value="propolis_trap">🟤 Propolis Trap</option>
-          </optgroup>
+          <option value="queen_excluder">👑 Queen Excluder</option>
+          <option value="pollen_trap">🌼 Bee Pollen Trap</option>
+          <option value="propolis_trap">🟤 Propolis Trap</option>
+          <option value="winter_blanket">❄️ Winter Blanket</option>
         </select>
         <label class="lbl">Action</label>
         <div style="display:flex;gap:8px;margin-bottom:10px">
-          <button type="button" id="equip-install-btn" onclick="setEquipAction('installed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#3a7d44;border:2px solid #3a7d44;color:#fff">📥 Added/Installed</button>
+          <button type="button" id="equip-install-btn" onclick="setEquipAction('installed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#3a7d44;border:2px solid #3a7d44;color:#fff">📥 Installed</button>
           <button type="button" id="equip-remove-btn" onclick="setEquipAction('removed')" style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#eee9db;border:2px solid #b83030;color:#b83030">📤 Removed</button>
         </div>
         <input type="hidden" id="log-equip-action" value="installed">
-        <label class="lbl" id="equip-position-label">Position in stack (1=bottom)</label>
-        <input type="number" class="inp" id="log-equip-position" placeholder="Leave blank for top" min="1" max="10">
+        <label class="lbl" id="equip-position-label">Notes</label>
+        <input type="text" class="inp" id="log-equip-position" placeholder="Optional notes">
       </div>
       <div id="log-install-fields" style="display:none">
         <label class="lbl">Breed</label>
@@ -1397,7 +1389,7 @@ function renderHive(){
   body+='</select></div>';
 
   // Show active equipment (pollen trap, queen excluder etc) as badges only — not bottom board/feeder which are already shown above
-  const equipNames={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder"};
+  const equipNames={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder",winter_blanket:"❄️ Winter blanket"};
   const activeEquipKeys=Object.keys(installedEquip);
   if(activeEquipKeys.length>0){
     body+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #eee9db;margin-top:4px">';
@@ -1409,7 +1401,7 @@ function renderHive(){
 
   // ── QUICK LOG BUTTONS ─────────────────────────────────────────────────────
   body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">';
-  [["🔍","Inspect","#3a7d44","inspection"],["🍯","Feed","#b87820","feeding"],["💊","Treat","#2060a0","treatment"],["🫙","Harvest","#6040a0","harvest"]].forEach(function(b){
+  [["🔍","Inspect","#3a7d44","inspection"],["🍯","Feed","#b87820","feeding"],["💊","Treat","#2060a0","treatment"],["🫙","Harvest","#6040a0","harvest"],["🔧","Equipment","#5a7a5a","equipment"],["📝","Note","#888","note"]].forEach(function(b){
     body+='<button class="btn-big" style="background:'+b[2]+';font-size:15px;padding:13px;margin-bottom:0" onclick="openLogModal({ap:\''+h.ap+'\',hv:\''+h.id+'\',etype:\''+b[3]+'\'})">'+b[0]+' '+b[1]+'</button>';
   });
   body+='</div>';
@@ -2496,8 +2488,8 @@ function renderReports(){
     html+='<div class="sec" style="margin-top:12px">🔎 Hive Finder</div>';
     html+='<div class="card" style="margin-bottom:10px">';
     html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-bottom:10px">Find all hives matching a condition:</div>';
-    var finderKeys=["comb_super","pollen_trap","queen_excluder","three_boxes","queen_cells","strong","solid_board","screened_board","pollen_board","inner_feeder","top_feeder","yellow_feeder"];
-    var finderLabels={comb_super:"🍯 Comb super",pollen_trap:"🌼 Pollen trap",queen_excluder:"👑 Queen excluder",three_boxes:"📦 3+ boxes",queen_cells:"🔶 Queen cells",strong:"💪 Strong",solid_board:"🪵 Solid board",screened_board:"🔲 Screened board",pollen_board:"🌼 Pollen board",inner_feeder:"🍯 Inner feeder",top_feeder:"🍯 Top feeder",yellow_feeder:"🟡 Yellow feeder"};
+    var finderKeys=["comb_super","pollen_trap","queen_excluder","winter_blanket","three_boxes","queen_cells","strong","solid_board","screened_board","pollen_board","inner_feeder","top_feeder","yellow_feeder"];
+    var finderLabels={comb_super:"🍯 Comb super",pollen_trap:"🌼 Pollen trap",queen_excluder:"👑 Queen excluder",winter_blanket:"❄️ Winter blanket",three_boxes:"📦 3+ boxes",queen_cells:"🔶 Queen cells",strong:"💪 Strong",solid_board:"🪵 Solid board",screened_board:"🔲 Screened board",pollen_board:"🌼 Pollen board",inner_feeder:"🍯 Inner feeder",top_feeder:"🍯 Top feeder",yellow_feeder:"🟡 Yellow feeder"};
     var activeQ=window._hiveFinderKey||"";
     html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
     finderKeys.forEach(function(k){
@@ -2587,7 +2579,6 @@ function renderReports(){
           html+='<span style="font-size:13px;color:#3a7d44;font-weight:700">✅</span>';
           html+='</div></div>';
         });
-        if(breed!=="Unknown breed")html+='<div style="font-size:12px;color:#3a7d44;font-family:sans-serif;margin-top:8px;font-weight:600">🧬 Good genetics — consider raising queens from these colonies</div>';
         html+='</div>';
       });
     }
@@ -2919,6 +2910,7 @@ function runHiveFinder(key){
   if(k==="comb_super")results=DB.hv.filter(function(h){return DB.ev.some(function(e){return e.hv===h.id&&e.type==="inspection"&&parseInt(e.boxes_added||0)>0&&e.box_type==="comb_super";});});
   else if(k==="pollen_trap")results=DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="pollen_trap";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});
   else if(k==="queen_excluder")results=DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="queen_excluder";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});
+  else if(k==="winter_blanket")results=DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="winter_blanket";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});
   else if(k==="three_boxes")results=DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});return 2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0)>=3;});
   else if(k==="queen_cells")results=DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});
   else if(k==="strong")results=DB.hv.filter(function(h){return h.str==="Strong";});
