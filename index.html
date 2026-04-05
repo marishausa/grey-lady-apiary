@@ -90,7 +90,7 @@ a{text-decoration:none}
     <div class="hero-row">
       <div>
         <div class="hero-date" id="home-date"></div>
-        <div class="hero-greeting">Good morning 🐝</div>
+        <div class="hero-greeting" id="home-greeting">Good morning 🐝</div>
       </div>
       <div id="wx-box" style="display:none" class="card" style="background:#3a5c3a;margin:0;padding:10px 14px;text-align:center">
         <div id="wx-icon" style="font-size:26px"></div>
@@ -893,6 +893,10 @@ function goScreen(s){
 // ─── HOME ────────────────────────────────────────────────────────────────────
 function renderHome(){
   document.getElementById("home-date").textContent=new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+  const hr=new Date().getHours();
+  const greeting=hr<12?"Good morning 🐝":hr<17?"Good afternoon 🐝":hr<21?"Good evening 🐝":"Good night 🌙";
+  const el=document.getElementById("home-greeting");
+  if(el)el.textContent=greeting;
   const ot=openTasks();
   const todayT=ot.filter(function(t){return t.due<=today();});
   // Active = has bees: explicitly set active, OR has an install event, OR survived winter
