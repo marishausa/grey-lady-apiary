@@ -626,6 +626,7 @@ const SB = {
     // Add optional columns only if they have values (avoids missing column errors)
     if(ev.boxes_added)row.boxes_added=parseInt(ev.boxes_added);
     if(ev.frames_added)row.frames_added=parseInt(ev.frames_added);
+    if(ev.frame_type)row.frame_type=ev.frame_type;
     if(ev.problems)row.problems=ev.problems;
     if(ev.frames)row.frames=parseInt(ev.frames);
     if(ev.frames_comb)row.frames_comb=parseInt(ev.frames_comb);
@@ -1028,8 +1029,8 @@ function eventRowHTML(ev,showAddr){
     if(ev.queen_cells===true)pills+='<span class="pill" style="background:#b8303020;border:1.5px solid #b8303050;color:#b83030">🔶 QC found</span>';
     if(ev.str)pills+='<span class="pill" style="background:#3a7d4420;border:1.5px solid #3a7d4450;color:#3a7d44">'+ev.str+'</span>';
     if(ev.brood)pills+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+ev.brood+' brood</span>';
-    if(ev.boxes_added&&ev.boxes_added!=0)pills+='<span class="pill" style="background:#8a9e8020;border:1.5px solid #8a9e8050;color:#4a6040">📦 '+(ev.boxes_added>0?"+":"")+ev.boxes_added+' box'+(Math.abs(ev.boxes_added)!==1?"es":"")+'</span>';
-    if(ev.frames_added&&ev.frames_added!=0)pills+='<span class="pill" style="background:#8a9e8020;border:1.5px solid #8a9e8050;color:#4a6040">🖼 '+(ev.frames_added>0?"+":"")+ev.frames_added+' frames</span>';
+    if(ev.boxes_added&&ev.boxes_added!=0)pills+='<span class="pill" style="background:#8a9e8020;border:1.5px solid #8a9e8050;color:#4a6040">📦 '+(ev.boxes_added>0?"+":"")+ev.boxes_added+' box'+(Math.abs(ev.boxes_added)!==1?"es":"")+(ev.box_type?" ("+ev.box_type+")":" ")+'</span>';
+    if(ev.frames_added&&ev.frames_added!=0)pills+='<span class="pill" style="background:#8a9e8020;border:1.5px solid #8a9e8050;color:#4a6040">🖼 '+(ev.frames_added>0?"+":"")+ev.frames_added+' '+(ev.frame_type||"")+(parseInt(ev.frames_added)!==1?" frames":" frame")+'</span>';
     if(pills)h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">'+pills+'</div>';
   }
   if(ev.type==="feeding"&&ev.feed_type)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:4px">'+ev.feed_type+(ev.amt?" · "+ev.amt:"")+'</div>';
@@ -3070,6 +3071,19 @@ function renderInspFields(){
   html+='<option value="winter">❄️ Winter</option>';
   html+='</select></div></div>';
 
+  // Frames added during inspection
+  html+='<label class="lbl">Frames Added / Removed</label>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Count (+/−)</div>';
+  html+='<input type="number" id="log-frames-added" class="inp" style="margin:0;text-align:center" placeholder="0" min="-20" max="40"></div>';
+  html+='<div><div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:4px">Frame type</div>';
+  html+='<select id="log-frame-added-type" class="sel" style="margin:0">';
+  html+='<option value="foundation">Foundation</option>';
+  html+='<option value="drawn">Drawn comb</option>';
+  html+='<option value="drone">Drone frame</option>';
+  html+='<option value="comb_honey">Comb honey frame</option>';
+  html+='</select></div></div>';
+
   // Problems
   html+='<label class="lbl">Problems</label>';
   html+='<input class="inp" id="log-problems" placeholder="e.g. Varroa mites, chalkbrood, small hive beetles…">';
@@ -3136,11 +3150,16 @@ async function saveLog(){
     ev.capped_brood=logCappedBrood;
     const boxesAdded=document.getElementById("log-boxes-added")?parseInt(document.getElementById("log-boxes-added").value)||0:0;
     const boxType=document.getElementById("log-box-added-type")?document.getElementById("log-box-added-type").value:"medium";
+    const framesAdded=document.getElementById("log-frames-added")?parseInt(document.getElementById("log-frames-added").value)||0:0;
+    const frameType=document.getElementById("log-frame-added-type")?document.getElementById("log-frame-added-type").value:"foundation";
     if(boxesAdded){ev.boxes_added=boxesAdded;ev.box_type=boxType;}
+    if(framesAdded){ev.frames_added=framesAdded;ev.frame_type=frameType;}
     ev.problems=document.getElementById("log-problems")?document.getElementById("log-problems").value||null:null;
     const parts=[];
     if(boxesAdded>0)parts.push("Added "+boxesAdded+" "+boxType+" box"+(boxesAdded!==1?"es":""));
     if(boxesAdded<0)parts.push("Removed "+Math.abs(boxesAdded)+" box"+(Math.abs(boxesAdded)!==1?"es":""));
+    if(framesAdded>0)parts.push("Added "+framesAdded+" "+frameType+" frame"+(framesAdded!==1?"s":""));
+    if(framesAdded<0)parts.push("Removed "+Math.abs(framesAdded)+" frame"+(Math.abs(framesAdded)!==1?"s":""));
     if(ev.problems)parts.push("⚠️ "+ev.problems);
     if(parts.length&&!ev.notes)ev.notes=parts.join(" · ");
     else if(parts.length&&ev.notes)ev.notes=ev.notes+" | "+parts.join(" · ");
