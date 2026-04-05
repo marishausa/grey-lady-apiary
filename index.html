@@ -792,8 +792,8 @@ const HOSTS=[
 {id:"a52",addr:"160 Madaket Rd",contact:"Michele McMahon Velle",hives:1,lat:41.2842,lng:-70.1374}
 ];
 
-const BREEDS=["Italian","Carniolan","Caucasian","Russian","Buckfast","VSH","Mixed","Unknown"];
-const BC={Italian:"#d4a017",Carniolan:"#4a7aaa",Caucasian:"#5a8a5a",Russian:"#aa4a4a",Buckfast:"#a07830",VSH:"#4a8a8a",Mixed:"#8a7a6a",Unknown:"#aaaaaa"};
+const BREEDS=["Italian","Carniolan","Caucasian","Russian","Unknown"];
+const BC={Italian:"#d4a017",Carniolan:"#4a7aaa",Caucasian:"#5a8a5a",Russian:"#aa4a4a",Unknown:"#aaaaaa"};
 const FEED=["1:1 Syrup","2:1 Syrup","Pollen Patty","Dry Sugar","Fondant","Other"];
 const TREAT=["Oxalic Acid","Apivar","Apistan","Mite Away","HopGuard","Other"];
 const ET={
@@ -1422,10 +1422,13 @@ function renderHive(){
   body+='</div></div>';
 
   // ── BREED ─────────────────────────────────────────────────────────────────
-  body+='<div class="card" style="margin-bottom:14px"><div style="font-size:15px;font-weight:700;margin-bottom:8px">🧬 Breed</div><div style="display:flex;gap:7px;flex-wrap:wrap">';
+  body+='<div class="card" style="margin-bottom:14px">';
+  body+='<div style="font-size:15px;font-weight:700;margin-bottom:10px">🧬 Breed</div>';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   BREEDS.forEach(function(b){
-    const sel=h.breed===b;const col=BC[b]||"#888";
-    body+='<button onclick="updHv(\''+h.id+'\',\'breed\',\''+b+'\')" style="padding:8px 12px;border-radius:20px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?col:"#fff")+';border:2.5px solid '+col+';color:'+(sel?"#fff":col)+'">'+b+'</button>';
+    const sel=h.breed===b;
+    const col=BC[b]||"#888";
+    body+='<button onclick="updHvBreed(\''+h.id+'\',\''+b+'\')" style="padding:12px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(sel?col:"#fff")+';border:2.5px solid '+col+';color:'+(sel?"#fff":col)+';text-align:center">'+b+'</button>';
   });
   body+='</div></div>';
 
@@ -1484,6 +1487,12 @@ function renderHive(){
   document.getElementById("hive-body").innerHTML=body;
 }
 
+async function updHvBreed(hid,val){
+  await SB.updateHive(hid,{breed:val});
+  DB.hv=DB.hv.map(function(h){return h.id!==hid?h:Object.assign({},h,{breed:val});});
+  renderHive();
+  toast$("🧬 "+val+" saved");
+}
 async function setHvBoxType(hid,idx,val){
   // Get current array
   const h=DB.hv.find(function(x){return x.id===hid;});
