@@ -1363,55 +1363,57 @@ function renderHive(){
   body+='<span style="font-size:18px;font-weight:800;color:#2d4a2d;min-width:24px;text-align:center">'+startBoxCount+'</span>';
   body+='<button onclick="setHvBoxCount(\''+h.id+'\','+(startBoxCount+1)+')" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #c8bc98;background:#fff;font-size:18px;cursor:pointer">+</button>';
   body+='</div>';
-  // Per-box type selector
-  var boxTypeOpts=[{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter"},{v:"comb_super",l:"🍯 Comb super"}];
-  var boxColors2={medium:"#3a7d44",deep:"#2060a0",shallow:"#b87820",winter:"#6040a0",comb_super:"#b06020"};
+  // Per-box dropdown
+  var boxTypeOpts=[{v:"medium",l:"Medium"},{v:"deep",l:"Deep"},{v:"shallow",l:"Shallow"},{v:"winter",l:"❄️ Winter"},{v:"comb_super",l:"🍯 Comb honey super"}];
   startBoxArr.forEach(function(btype,idx){
-    var col=boxColors2[btype]||"#888";
+    var label="Box "+(idx+1)+(idx===0?" (bottom)":idx===startBoxArr.length-1?" (top)":"");
     body+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
-    body+='<span style="font-size:12px;font-weight:700;color:#8a9e80;min-width:55px">Box '+(idx+1)+(idx===0?" (btm)":idx===startBoxArr.length-1?" (top)":"")+'</span>';
-    body+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    body+='<span style="font-size:13px;font-family:sans-serif;color:#4a6040;min-width:80px">'+label+'</span>';
+    body+='<select onchange="setHvBoxType(\''+h.id+'\','+idx+',this.value)" style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid #c8bc98;font-size:14px;font-family:sans-serif;background:#fff">';
     boxTypeOpts.forEach(function(opt){
-      var sel=btype===opt.v;
-      var c=boxColors2[opt.v]||"#888";
-      body+='<button onclick="setHvBoxType(\''+h.id+'\','+idx+',\''+opt.v+'\')" style="padding:4px 8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid '+c+';background:'+(sel?c:"#fff")+';color:'+(sel?"#fff":c)+'">'+opt.l+'</button>';
+      body+='<option value="'+opt.v+'"'+(btype===opt.v?" selected":"")+'>'+opt.l+'</option>';
     });
-    body+='</div></div>';
+    body+='</select></div>';
   });
   body+='</div>';
 
-  // Bottom board
-  const bbL={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen board"};
-  const bottomBoard=h.bottom_board||null;
-  body+='<div style="margin-bottom:12px">';
-  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Bottom Board</div>';
-  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  [{v:"solid",l:"🪵 Solid"},{v:"screened",l:"🔲 Screened"},{v:"pollen",l:"🌼 Pollen board"}].forEach(function(bb){
-    const sel=bottomBoard===bb.v;
-    body+='<button onclick="setHvField(\''+h.id+'\',\'bottom_board\',\''+bb.v+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #b87820;background:'+(sel?"#b87820":"#fff")+';color:'+(sel?"#fff":"#b87820")+'">'+bb.l+'</button>';
-  });
-  if(bottomBoard)body+='<button onclick="setHvField(\''+h.id+'\',\'bottom_board\',null)" style="padding:8px 10px;border-radius:10px;font-size:12px;cursor:pointer;font-family:sans-serif;border:2px solid #c8bc98;background:#fff;color:#8a9e80">✕</button>';
-  body+='</div></div>';
-
-  // Feeder
-  const feeder=h.feeder||null;
-  const fL={inner:"🍯 Inner",top:"🍯 Top",yellow_top:"🟡 Yellow top"};
+  // Bottom board — dropdown
+  const bbL={solid:"🪵 Solid",screened:"🔲 Screened",pollen:"🌼 Pollen trap board"};
+  const bottomBoard=h.bottom_board||"";
   body+='<div style="margin-bottom:10px">';
-  body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Feeder</div>';
-  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  [{v:"inner",l:"🍯 Inner"},{v:"top",l:"🍯 Top"},{v:"yellow_top",l:"🟡 Yellow top"},{v:"none",l:"None"}].forEach(function(f){
-    const sel=feeder===f.v;
-    body+='<button onclick="setHvField(\''+h.id+'\',\'feeder\',\''+f.v+'\')" style="padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;border:2px solid #2060a0;background:'+(sel?"#2060a0":"#fff")+';color:'+(sel?"#fff":"#2060a0")+'">'+f.l+'</button>';
+  body+='<label style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Bottom Board</label>';
+  body+='<select onchange="setHvField(\''+h.id+'\',\'bottom_board\',this.value||null)" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #c8bc98;font-size:14px;font-family:sans-serif;background:#fff">';
+  body+='<option value="">— Not set —</option>';
+  [{v:"solid",l:"🪵 Solid bottom board"},{v:"screened",l:"🔲 Screened bottom board"},{v:"pollen",l:"🌼 Pollen trap bottom board"}].forEach(function(bb){
+    body+='<option value="'+bb.v+'"'+(bottomBoard===bb.v?" selected":"")+'>'+bb.l+'</option>';
   });
-  body+='</div></div>';
+  body+='</select></div>';
+
+  // Feeder — dropdown with sizes
+  const feeder=h.feeder||"";
+  body+='<div style="margin-bottom:10px">';
+  body+='<label style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Feeder</label>';
+  body+='<select onchange="setHvField(\''+h.id+'\',\'feeder\',this.value||null)" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #c8bc98;font-size:14px;font-family:sans-serif;background:#fff">';
+  body+='<option value="">— None —</option>';
+  [{v:"inner_1gal",l:"🍯 Inner feeder — 1 gal"},{v:"top_2gal",l:"🍯 Top feeder — 2 gal"},{v:"yellow_top_1gal",l:"🟡 Yellow top feeder — 1 gal"},{v:"black_lg_4gal",l:"⬛ Black large feeder — 4 gal"},{v:"none",l:"No feeder"}].forEach(function(f){
+    body+='<option value="'+f.v+'"'+(feeder===f.v?" selected":"")+'>'+f.l+'</option>';
+  });
+  body+='</select></div>';
+  body+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  [{v:"inner_1gal",l:"🍯 Inner — 1 gal"},{v:"top_2gal",l:"🍯 Top — 2 gal"},{v:"yellow_top_1gal",l:"🟡 Yellow top — 1 gal"},{v:"black_lg_4gal",l:"⬛ Black — 4 gal"},{v:"none",l:"No feeder"}].forEach(function(f){
+    const sel=feeder===f.v;
+    body+='<option value="'+f.v+'"'+(sel?" selected":"")+'>'+f.l+'</option>';
+  });
 
   // Active equipment badges
+  const feederLabels={inner_1gal:"🍯 Inner 1gal",top_2gal:"🍯 Top 2gal",yellow_top_1gal:"🟡 Yellow top 1gal",black_lg_4gal:"⬛ Black 4gal"};
+  const bbLabels2={solid:"🪵 Solid board",screened:"🔲 Screened board",pollen:"🌼 Pollen board"};
   const equipNames={pollen_trap:"🌼 Pollen trap",propolis_trap:"🟤 Propolis trap",queen_excluder:"👑 Queen excluder"};
   const activeEquipKeys=Object.keys(installedEquip);
   if(activeEquipKeys.length>0||bottomBoard||feeder){
     body+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #c8bc98">';
-    if(bottomBoard)body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">'+(bbL[bottomBoard]||bottomBoard)+'</span>';
-    if(feeder&&feeder!=="none")body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(fL[feeder]||feeder)+' feeder</span>';
+    if(bottomBoard)body+='<span class="pill" style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820">'+(bbLabels2[bottomBoard]||bottomBoard)+'</span>';
+    if(feeder&&feeder!=="none")body+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+(feederLabels[feeder]||feeder)+'</span>';
     activeEquipKeys.forEach(function(k){body+='<span class="pill" style="background:#8040a020;border:1.5px solid #8040a050;color:#8040a0">'+(equipNames[k]||k)+'</span>';});
     body+='</div>';
   }
