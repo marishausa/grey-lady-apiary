@@ -398,8 +398,10 @@ a{text-decoration:none}
     <div>
       <label class="lbl">Host</label>
       <select class="sel" id="log-ap" onchange="logApChanged()"></select>
-      <label class="lbl">Hive</label>
-      <select class="sel" id="log-hv"></select>
+      <label class="lbl">Hives</label>
+      <div id="log-hv-wrap">
+        <select class="sel" id="log-hv"></select>
+      </div>
       <label class="lbl">Date</label>
       <input type="date" class="inp" id="log-date">
       <div id="log-insp-fields"></div>
@@ -1645,6 +1647,7 @@ function renderHive(){
   body+='<div style="display:flex;gap:8px;margin-bottom:6px">';
   body+='<button onclick="markWinterSurvival(\''+h.id+'\',true)" style="flex:1;padding:11px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(survived?"#3a7d44":"#eee9db")+';border:2px solid #3a7d44;color:'+(survived?"#fff":"#3a7d44")+'">✅ Survived</button>';
   body+='<button onclick="markWinterSurvival(\''+h.id+'\',false)" style="flex:1;padding:11px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;background:'+(deadOut?"#b83030":"#eee9db")+';border:2px solid #b83030;color:'+(deadOut?"#fff":"#b83030")+'">💀 Dead-out</button>';
+  if(survived||deadOut)body+='<button onclick="clearWinterSurvival(\''+h.id+'\')" style="padding:11px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif;background:#eee9db;border:2px solid #8a9e80;color:#8a9e80">✕ Clear</button>';
   body+='</div>';
   if(survived)body+='<div style="font-size:13px;color:#3a7d44;font-family:sans-serif;font-weight:600">✅ Survived Winter '+thisYear+(h.breed?" · "+h.breed:"")+'</div>';
   else if(deadOut)body+='<div style="font-size:13px;color:#b83030;font-family:sans-serif;font-weight:600">💀 Dead-out Winter '+thisYear+(h.breed?" · "+h.breed:"")+'</div>';
@@ -1812,19 +1815,23 @@ async function confirmRemoveHive(hiveId,apId){
 async function markWinterSurvival(hid,survived){
   const yr=new Date().getFullYear();
   const fields={winter_survived:survived,winter_year:yr};
-  // Survived → set status to active
-  // Dead-out → set status to dead (can be changed manually later)
   fields.hive_status=survived?"active":"dead";
   await SB.updateHive(hid,fields);
   DB.hv=DB.hv.map(function(h){
     if(h.id!==hid)return h;
-    return Object.assign({},h,{
-      winter_survived:survived,
-      winter_year:yr,
-      status:survived?"active":"dead"
-    });
+    return Object.assign({},h,{winter_survived:survived,winter_year:yr,status:survived?"active":"dead"});
   });
   toast$(survived?"✅ Survived — hive set to Active":"💀 Dead-out recorded — set status to Waiting when ready for new bees");
+  renderHive();
+}
+
+async function clearWinterSurvival(hid){
+  await SB.updateHive(hid,{winter_survived:null,winter_year:null});
+  DB.hv=DB.hv.map(function(h){
+    if(h.id!==hid)return h;
+    return Object.assign({},h,{winter_survived:null,winter_year:null});
+  });
+  toast$("Winter survival cleared");
   renderHive();
 }
 
@@ -3197,7 +3204,14 @@ function openLogModal(data){
   document.getElementById("log-breed").innerHTML='<option value="">— Select breed —</option>'+BREEDS.map(function(b){return'<option>'+b+'</option>';}).join("");
   
   if(data.ap){logApChanged();}
-  if(data.hv){document.getElementById("log-hv").value=data.hv;}
+  if(data.hv){
+    // Pre-select specific hive checkbox
+    setTimeout(function(){
+      const cb=document.querySelector('.log-hv-cb[value="'+data.hv+'"]');
+      if(cb){cb.checked=true;logHvCbChanged();}
+      else{const sel=document.getElementById("log-hv");if(sel)sel.value=data.hv;}
+    },50);
+  }
   if(data.breed){
     // Will be set after install fields render
     setTimeout(function(){
@@ -3354,18 +3368,69 @@ function setEquipAction(action){
 }
 function logApChanged(){
   const apId=document.getElementById("log-ap").value;
-  const hvSel=document.getElementById("log-hv");
   const hvs=DB.hv.filter(function(h){return h.ap===apId;});
-  hvSel.innerHTML='<option value="">— All hives —</option>'+hvs.map(function(h){return'<option value="'+h.id+'">Hive '+h.n+(h.breed?" ("+h.breed+")":"")+'</option>';}).join("");
+  const wrap=document.getElementById("log-hv-wrap");
+  if(!wrap)return;
+  if(hvs.length===0){
+    wrap.innerHTML='<select class="sel" id="log-hv"><option value="">— All hives —</option></select>';
+    return;
+  }
+  // Multi-select checkboxes
+  var html='<div style="border:1.5px solid #c8bc98;border-radius:10px;overflow:hidden;margin-bottom:2px">';
+  // All hives option
+  html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f0f7f0;border-bottom:1px solid #e0e8d8;cursor:pointer">';
+  html+='<input type="checkbox" id="log-hv-all" onchange="logHvAllToggle(this)" style="width:18px;height:18px;cursor:pointer">';
+  html+='<span style="font-size:15px;font-weight:700;color:#2d4a2d">All '+hvs.length+' hives</span>';
+  html+='</label>';
+  // Individual hives
+  hvs.forEach(function(h){
+    html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eee9db;cursor:pointer;background:#fff">';
+    html+='<input type="checkbox" class="log-hv-cb" value="'+h.id+'" onchange="logHvCbChanged()" style="width:18px;height:18px;cursor:pointer">';
+    html+='<span style="font-size:14px;color:#1a2e1a">Hive '+h.n+(h.breed?' <span style="color:#8a9e80;font-size:12px">('+h.breed+')</span>':'')+'</span>';
+    html+='</label>';
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+function logHvAllToggle(cb){
+  const checked=cb.checked;
+  document.querySelectorAll(".log-hv-cb").forEach(function(c){c.checked=checked;});
+}
+function logHvCbChanged(){
+  const all=document.querySelectorAll(".log-hv-cb");
+  const checked=[...all].filter(function(c){return c.checked;});
+  const allCb=document.getElementById("log-hv-all");
+  if(allCb)allCb.checked=checked.length===all.length;
+}
+function getSelectedHiveIds(){
+  // Returns array of selected hive IDs, or empty array for "all hives"
+  const allCb=document.getElementById("log-hv-all");
+  const cbs=[...document.querySelectorAll(".log-hv-cb")];
+  if(cbs.length===0){
+    // Fallback to old single select
+    const sel=document.getElementById("log-hv");
+    return sel?[sel.value]:[];
+  }
+  if(allCb&&allCb.checked)return[]; // empty = all hives
+  return cbs.filter(function(c){return c.checked;}).map(function(c){return c.value;});
 }
 async function saveLog(){
   const apId=document.getElementById("log-ap").value;
   if(!apId){toast$("Select a host",true);return;}
-  const hvId=document.getElementById("log-hv").value;
+  const selectedHvIds=getSelectedHiveIds();
+  // If none selected and not "all", prompt
+  if(selectedHvIds!==null&&selectedHvIds.length===0){
+    // Check if any checkboxes exist but none are ticked
+    const cbs=document.querySelectorAll(".log-hv-cb");
+    if(cbs.length>0){toast$("Select at least one hive",true);return;}
+  }
   const date=document.getElementById("log-date").value;
   const notes=document.getElementById("log-notes").value;
   const followup=document.getElementById("log-followup").value;
-  const ev={id:uid(),ap:apId,hv:hvId||null,date:date,notes:notes,type:logType};
+
+  // Build base event data
+  const baseEv={ap:apId,date:date,notes:notes,type:logType};
+  const ev=baseEv; // alias so existing code below works unchanged
   if(logType==="inspection"){
     ev.queen_seen=logQ;ev.str=logStr;ev.brood=logBrd;
     ev.eggs_seen=logEggs;
@@ -3418,17 +3483,34 @@ async function saveLog(){
     ev.equip_type=document.getElementById("log-equip-type").value;
     ev.equip_action=document.getElementById("log-equip-action").value;
     ev.equip_position=document.getElementById("log-equip-position")?parseInt(document.getElementById("log-equip-position").value)||null:null;
-    const isBox=ev.equip_type.startsWith("box_");
-    const equipNames={queen_excluder:"Queen excluder",pollen_trap:"Pollen trap",propolis_trap:"Propolis trap",box_medium:"Medium box",box_deep:"Deep box",box_shallow:"Shallow box",box_winter:"Winter box",box_comb_super:"Comb honey super"};
-    const actionWord=ev.equip_action==="installed"?(isBox?"Added":"Installed"):"Removed";
-    if(!ev.notes)ev.notes=actionWord+" "+(equipNames[ev.equip_type]||ev.equip_type)+(ev.equip_position?" at position "+ev.equip_position:"");
+    const equipNames={queen_excluder:"Queen excluder",pollen_trap:"Pollen trap",propolis_trap:"Propolis trap",winter_blanket:"Winter blanket"};
+    const actionWord=ev.equip_action==="installed"?"Installed":"Removed";
+    if(!ev.notes)ev.notes=actionWord+" "+(equipNames[ev.equip_type]||ev.equip_type);
   }
 
-  const ok = await SB.addEvent(ev);
-  if(!ok){toast$("Save failed — check connection",true);console.error("Failed event:",JSON.stringify(ev));return;}
-
-  ev.ts = new Date().toISOString();
-  DB.ev.unshift(ev);
+  // Determine which hives to save for
+  // selectedHvIds: [] = all hives (apiary-level), ['id1','id2'] = specific hives
+  var hvIdsToSave=selectedHvIds;
+  // If "All hives" checked (empty array) → save one event with hv=null
+  if(hvIdsToSave.length===0){
+    ev.id=uid();ev.hv=null;
+    const ok=await SB.addEvent(ev);
+    if(!ok){toast$("Save failed — check connection",true);return;}
+    ev.ts=new Date().toISOString();
+    DB.ev.unshift(Object.assign({},ev));
+  } else {
+    // Save one event per selected hive
+    var saved=0;
+    for(var si=0;si<hvIdsToSave.length;si++){
+      const hvEv2=Object.assign({},ev,{id:uid(),hv:hvIdsToSave[si]});
+      const ok=await SB.addEvent(hvEv2);
+      if(ok){DB.ev.unshift(Object.assign({},hvEv2));saved++;}
+    }
+    if(saved===0){toast$("Save failed — check connection",true);return;}
+    // Use last saved event for downstream logic (breed update etc)
+    ev.hv=hvIdsToSave[hvIdsToSave.length-1];
+    ev.id=uid();
+  }
 
   // If install, update the hive breed automatically
   if(logType==="install" && ev.breed) {
