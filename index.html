@@ -1038,7 +1038,8 @@ function isOD(d){return d&&d<today();}
 function getAp(id){return DB.ap.find(function(a){return a.id===id;});}
 function getHv(id){return DB.hv.find(function(h){return h.id===id;});}
 function hvName(h){return h.label?h.n+" · "+h.label:""+h.n;}
-function hvNameFull(h){return h.label?"Hive "+h.n+" · "+h.label:hvNameFull(h);}
+function hvNameFull(h){return h.label?"Hive "+h.n+" · "+h.label:"Hive "+h.n;}
+function apTk(aid){return DB.tk.filter(function(t){return t.ap===aid&&t.status==="open";});}
 function hvTk(hid){
   const h=DB.hv.find(function(x){return x.id===hid;});
   const apId=h?h.ap:null;
