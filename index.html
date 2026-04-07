@@ -677,6 +677,7 @@ const SB = {
   async updateHive(id, fields) {
     // Map app field names to DB column names
     const mapped = {};
+    if (fields.label !== undefined)           mapped.label            = fields.label || null;
     if (fields.breed !== undefined)            mapped.breed            = fields.breed;
     if (fields.queen !== undefined)            mapped.queen            = fields.queen;
     if (fields.str !== undefined)              mapped.strength         = fields.str;
@@ -819,7 +820,7 @@ let DB = {ap:[], hv:[], ev:[], tk:[], tr:[]};
 
 // Map Supabase column names → app field names
 function mapAp(row){return{id:row.id,addr:row.addr,contact:row.contact,hives:row.hives,lat:row.lat,lng:row.lng,phone:row.phone||'',notes:row.notes||''};}
-function mapHv(row){return{id:row.id,ap:row.apiary_id,n:row.num,breed:row.breed,queen:row.queen||'Unknown',str:row.strength||'Medium',risk:row.risk,notes:row.notes||'',status:row.hive_status||'active',winter_survived:row.winter_survived===null||row.winter_survived===undefined?null:row.winter_survived,winter_year:row.winter_year||null,box_count:row.box_count||null,box_types:row.box_types||null,bottom_board:row.bottom_board||null,feeder:row.feeder||null};}
+function mapHv(row){return{id:row.id,ap:row.apiary_id,n:row.num,label:row.label||null,breed:row.breed,queen:row.queen||'Unknown',str:row.strength||'Medium',risk:row.risk,notes:row.notes||'',status:row.hive_status||'active',winter_survived:row.winter_survived===null||row.winter_survived===undefined?null:row.winter_survived,winter_year:row.winter_year||null,box_count:row.box_count||null,box_types:row.box_types||null,bottom_board:row.bottom_board||null,feeder:row.feeder||null};}
 function mapEv(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:row.date,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,capped_brood:row.capped_brood,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,equip_type:row.equip_type,equip_action:row.equip_action};}
 
 function mapTk(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,ttype:row.task_type,notes:row.notes,due:row.due_date,status:row.status,ts:row.created_at};}
@@ -1032,7 +1033,8 @@ function dAgo(d){if(!d)return null;const n=Math.floor((Date.now()-new Date(d+"T1
 function isOD(d){return d&&d<today();}
 function getAp(id){return DB.ap.find(function(a){return a.id===id;});}
 function getHv(id){return DB.hv.find(function(h){return h.id===id;});}
-function apTk(aid){return DB.tk.filter(function(t){return t.ap===aid&&t.status==="open";});}
+function hvName(h){return h.label?h.n+" · "+h.label:""+h.n;}
+function hvNameFull(h){return h.label?"Hive "+h.n+" · "+h.label:hvNameFull(h);}
 function hvTk(hid){
   const h=DB.hv.find(function(x){return x.id===hid;});
   const apId=h?h.ap:null;
@@ -1143,7 +1145,7 @@ function renderHome(){
       html+='<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer" onclick="openApiary(\''+apId+'\')">';
       html+='<div style="font-size:14px;font-weight:700;color:#fff">'+(ap?ap.addr:"Unknown")+'</div>';
       html+='<div style="font-size:13px;color:#c8d8f0;font-family:sans-serif;margin-top:2px">';
-      html+=hvs.map(function(h){return"Hive "+h.n;}).join(" · ");
+      html+=hvs.map(function(h){returnhvNameFull(h);}).join(" · ");
       html+='</div></div>';
     });
     html+='<div style="font-size:12px;color:#c8d8f0;font-family:sans-serif;margin-top:4px">Tap a location to log installation</div>';
@@ -1357,6 +1359,7 @@ function renderApiary(){
     body+='<div class="hive-card" style="'+bstyle+(statusBg?";"+statusBg:"")+'" onclick="openHive(\''+h.id+'\')">';
     body+='<div style="font-size:20px">'+(statusIcon||"🐝")+'</div>';
     body+='<div style="font-size:20px;font-weight:800;color:'+(hst==="active"?"#3a7d44":hst==="dead"?"#b83030":"#8a9e80")+';margin-top:2px">'+h.n+'</div>';
+    if(h.label)body+='<div style="font-size:10px;font-weight:700;color:#4a6040;font-family:sans-serif">'+escHtml(h.label)+'</div>';
     if(h.breed&&hst==="active")body+='<div style="font-size:11px;font-weight:700;color:'+(BC[h.breed]||"#4a6040")+'">'+h.breed.slice(0,6)+'</div>';
     if(hst!=="active")body+='<div style="font-size:10px;color:#8a9e80;font-family:sans-serif;font-weight:700;text-transform:uppercase">'+(hst==="dead"?"Dead-out":hst==="empty"?"Empty":"Waiting")+'</div>';
     if(ht.length>0&&hst==="active")body+='<div style="font-size:12px;color:#b87820;font-weight:700">'+ht.length+'📋</div>';
@@ -1390,13 +1393,13 @@ function renderHive(){
   const h=DB.hv.find(function(x){return x.id===selHv.id;});
   if(!h)return;
   const ap=getAp(h.ap);
-  document.getElementById("hive-hdr-title").textContent="Hive "+h.n;
+  document.getElementById("hive-hdr-title").textContent=hvNameFull(h);
 
   // Hero
   const hstColor={active:"#3a7d44",empty:"#8a9e80",dead:"#b83030",waiting:"#b87820"}[h.status||"active"]||"#3a7d44";
   let hero='<div style="display:flex;align-items:center;gap:12px">';
   hero+='<div style="width:52px;height:52px;background:'+hstColor+';border:2px solid #7ab87a;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px">🐝</div>';
-  hero+='<div><div style="font-size:26px;font-weight:800;color:#f0ede0;font-family:Georgia,serif">Hive '+h.n+'</div>';
+  hero+='<div><div style="font-size:26px;font-weight:800;color:#f0ede0;font-family:Georgia,serif">'+hvNameFull(h)+'</div>';
   hero+='<div style="font-size:15px;color:#9dc89d;font-family:sans-serif">'+(ap?ap.addr+" · "+ap.contact:"")+'</div></div></div>';
   hero+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">';
   if(h.breed)hero+='<span class="pill" style="background:'+(BC[h.breed]||"#888")+';color:#fff;font-size:14px">'+h.breed+'</span>';
@@ -1530,6 +1533,13 @@ function renderHive(){
   body+='<div style="font-size:15px;font-weight:800;color:#2d4a2d">🪵 Hive Setup</div>';
   body+='<button onclick="openLogModal({ap:\''+h.ap+'\',hv:\''+h.id+'\',etype:\'equipment\'})" style="padding:6px 14px;background:#b87820;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">+ Edit</button>';
   body+='</div>';
+  // Custom hive name/label
+  body+='<div style="margin-bottom:12px">';
+  body+='<label style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Hive Name / Label</label>';
+  body+='<div style="display:flex;gap:8px;align-items:center">';
+  body+='<input class="inp" id="hive-label-input" placeholder="e.g. 1a, Split, Nuc, Queen right…" value="'+escHtml(h.label||"")+'" style="margin:0;flex:1">';
+  body+='<button onclick="saveHiveLabel(\''+h.id+'\')" style="padding:8px 14px;background:#3a7d44;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save</button>';
+  body+='</div></div>';
 
   // Parse startBoxArr for dropdowns
   var startBoxArr=[];
@@ -1701,6 +1711,13 @@ async function updHvBreed(hid,val){
   DB.hv=DB.hv.map(function(h){return h.id!==hid?h:Object.assign({},h,{breed:val});});
   renderHive();
   toast$("🧬 "+val+" saved");
+}
+async function saveHiveLabel(hid){
+  const val=document.getElementById("hive-label-input").value.trim();
+  await SB.updateHive(hid,{label:val||null});
+  DB.hv=DB.hv.map(function(h){return h.id!==hid?h:Object.assign({},h,{label:val||null});});
+  renderHive();
+  toast$(val?"Label saved: "+val:"Label cleared");
 }
 async function setHvBoxType(hid,idx,val){
   // Get current array
@@ -2419,7 +2436,7 @@ function renderReports(){
         const ap=getAp(h.ap);const li=lastEv(h.id,"inspection");
         const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
         html+='<div class="tcard" onclick="openHive(\''+h.id+'\')">';
-        html+='<div style="font-size:16px;font-weight:700">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
+        html+='<div style="font-size:16px;font-weight:700">'+(ap?ap.addr:"")+" · "+hvNameFull(h)+'</div>';
         html+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif">';
         if(li)html+="Last: "+fmtD(li.date);
         else if(installEv)html+='📦 Installed '+fmtD(installEv.date)+' — first inspection due';
@@ -2462,7 +2479,7 @@ function renderReports(){
         const urgent=!lf||days>14;
         html+='<div class="tcard" style="border-left:4px solid '+(urgent?"#b83030":"#b87820")+'" onclick="openHive(\''+h.id+'\')">';
         html+='<div style="display:flex;justify-content:space-between;align-items:center">';
-        html+='<div><div style="font-size:16px;font-weight:700">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
+        html+='<div><div style="font-size:16px;font-weight:700">'+(ap?ap.addr:"")+" · "+hvNameFull(h)+'</div>';
         html+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif">'+(lf?"Last fed: "+fmtD(lf.date)+" ("+days+"d ago)":"Never fed")+'</div></div>';
         html+='<button onclick="event.stopPropagation();openLogModal({ap:\''+(h.ap)+'\',hv:\''+h.id+'\',etype:\'feeding\'})" style="background:#b87820;border:none;border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">+ Feed</button>';
         html+='</div></div>';
@@ -2586,7 +2603,7 @@ function renderReports(){
           const ap=getAp(h.ap);
           const installEv=getInstallEv(h);
           html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')">';
-          html+='<div style="font-size:14px;color:#1a2e1a;font-weight:600">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
+          html+='<div style="font-size:14px;color:#1a2e1a;font-weight:600">'+(ap?ap.addr:"")+" · "+hvNameFull(h)+'</div>';
           html+='<div style="text-align:right">';
           if(installEv)html+='<div style="font-size:12px;color:#b06020;font-family:sans-serif">📦 '+fmtD(installEv.date)+'</div>';
           if(h.str&&h.str!=="Medium")html+='<div style="font-size:11px;color:'+(h.str==="Strong"?"#3a7d44":"#b83030")+'">'+h.str+'</div>';
@@ -2616,7 +2633,7 @@ function renderReports(){
         html+='<div class="card" style="border-left:4px solid #2060a0;cursor:pointer" onclick="openApiary(\''+apId+'\')">';
         html+='<div style="display:flex;justify-content:space-between;align-items:center">';
         html+='<div><div style="font-size:15px;font-weight:700">'+(ap?ap.addr:"Unknown")+'</div>';
-        html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-top:2px">'+hvs.map(function(h){return"Hive "+h.n;}).join(" · ")+'</div></div>';
+        html+='<div style="font-size:13px;color:#4a6040;font-family:sans-serif;margin-top:2px">'+hvs.map(function(h){returnhvNameFull(h);}).join(" · ")+'</div></div>';
         html+='<span class="pill" style="background:#2060a020;border:1.5px solid #2060a050;color:#2060a0">'+hvs.length+' hive'+(hvs.length>1?"s":"")+'</span>';
         html+='</div></div>';
       });
@@ -2703,7 +2720,7 @@ function renderReports(){
         const days=li?Math.floor((Date.now()-new Date(li.date+"T12:00:00"))/86400000):null;
         html+='<div class="tcard" style="border-left:4px solid #c0392b" onclick="openHive(\''+h.id+'\')">';
         html+='<div style="display:flex;justify-content:space-between;align-items:center">';
-        html+='<div><div style="font-size:16px;font-weight:700">'+(ap?ap.addr:'')+" · Hive "+h.n+'</div>';
+        html+='<div><div style="font-size:16px;font-weight:700">'+(ap?ap.addr:'')+" · "+hvNameFull(h)+'</div>';
         html+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif">'+(h.str==="Strong"?"💪 Strong · ":"")+(days?days+"d since inspection":"Never inspected")+'</div></div>';
         html+='<button onclick="event.stopPropagation();openLogModal({ap:\''+h.ap+'\',hv:\''+h.id+'\',etype:\'inspection\'})" style="background:#c0392b;border:none;border-radius:10px;padding:10px 12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Inspect</button>';
         html+='</div></div>';
@@ -2814,7 +2831,7 @@ function renderReports(){
         items.forEach(function(item){
           const ap=getAp(item.h.ap);
           html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #c8bc98;cursor:pointer" onclick="setSelHvById(\''+item.h.id+'\');goScreen(\'hive\')">';
-          html+='<div style="font-size:14px;color:#1a2e1a">'+(ap?ap.addr:"")+" · Hive "+item.h.n+'</div>';
+          html+='<div style="font-size:14px;color:#1a2e1a">'+(ap?ap.addr:"")+" · "+hvNameFull(item.h)+'</div>';
           html+='<div style="display:flex;gap:6px;align-items:center">';
           if(item.h.str)html+='<span class="pill" style="background:'+(item.h.str==="Strong"?"#3a7d44":"#b87820")+'20;border:1.5px solid '+(item.h.str==="Strong"?"#3a7d44":"#b87820")+'50;color:'+(item.h.str==="Strong"?"#3a7d44":"#b87820")+'">'+item.h.str+'</span>';
           html+='<span style="font-size:13px;color:#3a7d44;font-weight:700">✅</span>';
@@ -2840,7 +2857,7 @@ function renderReports(){
         const reinstalled=DB.ev.some(function(e){return e.hv===h.id&&e.type==="install"&&e.date>=yr+"-01-01";});
         html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #c8bc98;cursor:pointer" onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')">';
         html+='<div>';
-        html+='<div style="font-size:14px;color:#1a2e1a;font-weight:600">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
+        html+='<div style="font-size:14px;color:#1a2e1a;font-weight:600">'+(ap?ap.addr:"")+" · "+hvNameFull(h)+'</div>';
         if(winterBreed)html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif">Last season: '+winterBreed+'</div>';
         else html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif">Breed unknown</div>';
         html+='</div>';
@@ -2860,7 +2877,7 @@ function renderReports(){
       notRecorded.forEach(function(h){
         const ap=getAp(h.ap);
         html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #c8bc98">';
-        html+='<div style="font-size:14px;color:#1a2e1a">'+(ap?ap.addr:"")+" · Hive "+h.n+(h.breed?" · "+h.breed:"")+'</div>';
+        html+='<div style="font-size:14px;color:#1a2e1a">'+(ap?ap.addr:"")+" · "+hvNameFull(h)+(h.breed?" · "+h.breed:"")+'</div>';
         html+='<button onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')" style="padding:6px 12px;background:#2060a0;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Record →</button>';
         html+='</div>';
       });
@@ -3168,7 +3185,7 @@ function runHiveFinder(key){
   results.forEach(function(h){
     const ap=getAp(h.ap);
     html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')">';
-    html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
+    html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"")+" · "+hvNameFull(h)+'</div>';
     html+='<span style="font-size:13px;color:#3a7d44;font-weight:700">Open →</span>';
     html+='</div>';
   });
