@@ -1,4 +1,4 @@
-const CACHE = 'grey-lady-v1';
+const CACHE = 'grey-lady-v2';
 const URLS = [
   '/grey-lady-apiary/',
   '/grey-lady-apiary/index.html',
