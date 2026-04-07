@@ -937,7 +937,12 @@ window.addEventListener("online",function(){
     DB.ev=data.ev.map(mapEv);
     DB.tk=data.tk.map(mapTk);
     DB.tr=data.tr||[];
-    idbSet("db",{ap:data.ap,hv:data.hv,ev:data.ev,tk:data.tk,tr:data.tr});
+    idbSet("db_ap",data.ap);
+    idbSet("db_hv",data.hv);
+    idbSet("db_ev",data.ev);
+    idbSet("db_tk",data.tk);
+    idbSet("db_tr",data.tr||[]);
+    idbSet("db_cached_at",new Date().toISOString());
     if(currentScreen)goScreen(currentScreen);
   });
 });
@@ -960,9 +965,14 @@ async function initDB(){
       DB.ev=data.ev.map(mapEv);
       DB.tk=data.tk.map(mapTk);
       DB.tr=data.tr||[];
-      // Cache to IndexedDB for offline use
-      await idbSet("db",{ap:data.ap,hv:data.hv,ev:data.ev,tk:data.tk,tr:data.tr});
-      console.log("Loaded from Supabase and cached offline");
+      // Cache each table separately to IndexedDB
+      await idbSet("db_ap", data.ap);
+      await idbSet("db_hv", data.hv);
+      await idbSet("db_ev", data.ev);
+      await idbSet("db_tk", data.tk);
+      await idbSet("db_tr", data.tr||[]);
+      await idbSet("db_cached_at", new Date().toISOString());
+      console.log("Cached offline: "+DB.hv.length+" hives, "+DB.ev.length+" events");
       syncPendingWrites();
     }catch(e){
       console.error("Supabase load error:",e);
@@ -976,17 +986,23 @@ async function initDB(){
 }
 
 async function loadFromCache(){
-  const cached=await idbGet("db");
-  if(cached){
-    DB.ap=cached.ap.map(mapAp);
-    DB.hv=cached.hv.map(mapHv);
-    DB.ev=cached.ev.map(mapEv);
-    DB.tk=cached.tk.map(mapTk);
-    DB.tr=cached.tr||[];
-    console.log("Loaded from offline cache");
-    toast$("⚡ Offline — using cached data");
+  const ap=await idbGet("db_ap");
+  const hv=await idbGet("db_hv");
+  const ev=await idbGet("db_ev");
+  const tk=await idbGet("db_tk");
+  const tr=await idbGet("db_tr");
+  const cachedAt=await idbGet("db_cached_at");
+  if(hv&&hv.length>0){
+    DB.ap=(ap||[]).map(mapAp);
+    DB.hv=hv.map(mapHv);
+    DB.ev=(ev||[]).map(mapEv);
+    DB.tk=(tk||[]).map(mapTk);
+    DB.tr=tr||[];
+    const when=cachedAt?new Date(cachedAt).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):"";
+    console.log("Loaded from offline cache: "+DB.hv.length+" hives");
+    toast$("⚡ Offline — using data cached "+(when?"at "+when:"earlier"));
   } else {
-    toast$("No cached data — connect to internet first","true");
+    toast$("No cached data — open app with internet first", true);
   }
 }
 
