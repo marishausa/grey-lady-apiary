@@ -510,8 +510,10 @@ a{text-decoration:none}
     </div>
     <label class="lbl">Host</label>
     <select class="sel" id="task-ap" onchange="taskApChanged()"></select>
-    <label class="lbl">Hive</label>
-    <select class="sel" id="task-hv"></select>
+    <label class="lbl">Hives</label>
+    <div id="task-hv-wrap">
+      <select class="sel" id="task-hv"><option value="">— All hives —</option></select>
+    </div>
     <label class="lbl">Task Type</label>
     <select class="sel" id="task-type"></select>
     <label class="lbl">Due Date</label>
@@ -1616,6 +1618,7 @@ function renderHive(){
   [["🔍","Inspect","#3a7d44","inspection"],["🍯","Feed","#b87820","feeding"],["💊","Treat","#2060a0","treatment"],["🫙","Harvest","#6040a0","harvest"],["🔧","Equipment","#5a7a5a","equipment"],["📝","Note","#888","note"]].forEach(function(b){
     body+='<button class="btn-big" style="background:'+b[2]+';font-size:15px;padding:13px;margin-bottom:0" onclick="openLogModal({ap:\''+h.ap+'\',hv:\''+h.id+'\',etype:\''+b[3]+'\'})">'+b[0]+' '+b[1]+'</button>';
   });
+  body+='<button class="btn-big" style="background:#4a6040;font-size:15px;padding:13px;margin-bottom:0;grid-column:1/-1" onclick="openTaskModal(\''+h.ap+'\',\''+h.id+'\')">📋 Add Task</button>';
   body+='</div>';
 
   // ── HIVE STATUS ───────────────────────────────────────────────────────────
@@ -3600,37 +3603,100 @@ async function saveLog(){
 }
 
 // ─── TASK MODAL ─────────────────────────────────────────────────────────────
-function openTaskModal(apId){
+function openTaskModal(apId, hvId){
   const apSel=document.getElementById("task-ap");
   apSel.innerHTML='<option value="">— Select —</option>'+DB.ap.map(function(a){return'<option value="'+a.id+'"'+(apId===a.id?" selected":"")+'>'+escHtml(a.addr)+' · '+escHtml(a.contact)+'</option>';}).join("");
   const typeSel=document.getElementById("task-type");
   typeSel.innerHTML=Object.keys(ET).map(function(k){return'<option value="'+k+'">'+ET[k].icon+' '+ET[k].label+'</option>';}).join("");
   document.getElementById("task-due").value=today();
   document.getElementById("task-notes").value="";
-  if(apId)taskApChanged();
+  if(apId){
+    taskApChanged();
+    // Pre-select specific hive if provided
+    if(hvId){
+      setTimeout(function(){
+        const cb=document.querySelector('#task-hv-wrap .task-hv-cb[value="'+hvId+'"]');
+        if(cb){cb.checked=true;taskHvCbChanged();}
+      },50);
+    }
+  }
   document.getElementById("task-modal").classList.add("open");
 }
 function taskApChanged(){
   const apId=document.getElementById("task-ap").value;
-  const hvSel=document.getElementById("task-hv");
   const hvs=DB.hv.filter(function(h){return h.ap===apId;});
-  hvSel.innerHTML='<option value="">— All hives —</option>'+hvs.map(function(h){return'<option value="'+h.id+'">Hive '+h.n+'</option>';}).join("");
+  const wrap=document.getElementById("task-hv-wrap");
+  if(!wrap)return;
+  if(hvs.length===0){
+    wrap.innerHTML='<select class="sel" id="task-hv"><option value="">— All hives —</option></select>';
+    return;
+  }
+  var html='<div style="border:1.5px solid #c8bc98;border-radius:10px;overflow:hidden;margin-bottom:2px">';
+  html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f0f7f0;border-bottom:1px solid #e0e8d8;cursor:pointer">';
+  html+='<input type="checkbox" id="task-hv-all" onchange="taskHvAllToggle(this)" style="width:18px;height:18px;cursor:pointer">';
+  html+='<span style="font-size:15px;font-weight:700;color:#2d4a2d">All '+hvs.length+' hives</span>';
+  html+='</label>';
+  hvs.forEach(function(h){
+    html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eee9db;cursor:pointer;background:#fff">';
+    html+='<input type="checkbox" class="task-hv-cb" value="'+h.id+'" onchange="taskHvCbChanged()" style="width:18px;height:18px;cursor:pointer">';
+    html+='<span style="font-size:14px;color:#1a2e1a">Hive '+h.n+(h.breed?' <span style="color:#8a9e80;font-size:12px">('+h.breed+')</span>':'')+'</span>';
+    html+='</label>';
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+function taskHvAllToggle(cb){
+  document.querySelectorAll(".task-hv-cb").forEach(function(c){c.checked=cb.checked;});
+}
+function taskHvCbChanged(){
+  const all=document.querySelectorAll(".task-hv-cb");
+  const checked=[...all].filter(function(c){return c.checked;});
+  const allCb=document.getElementById("task-hv-all");
+  if(allCb)allCb.checked=checked.length===all.length;
+}
+function getSelectedTaskHiveIds(){
+  const allCb=document.getElementById("task-hv-all");
+  const cbs=[...document.querySelectorAll(".task-hv-cb")];
+  if(cbs.length===0){
+    const sel=document.getElementById("task-hv");
+    return sel?[sel.value]:[];
+  }
+  if(allCb&&allCb.checked)return[];
+  return cbs.filter(function(c){return c.checked;}).map(function(c){return c.value;});
 }
 async function saveTask(){
   const apId=document.getElementById("task-ap").value;
   if(!apId){toast$("Select a host",true);return;}
-  const hvId=document.getElementById("task-hv").value;
+  const selectedHvIds=getSelectedTaskHiveIds();
+  // Require at least one selection if checkboxes exist
+  const cbs=document.querySelectorAll(".task-hv-cb");
+  if(cbs.length>0&&selectedHvIds.length===0&&!(document.getElementById("task-hv-all")&&document.getElementById("task-hv-all").checked)){
+    toast$("Select at least one hive",true);return;
+  }
   const ttype=document.getElementById("task-type").value;
   const due=document.getElementById("task-due").value;
   const notes=document.getElementById("task-notes").value;
-  const tk={id:uid(),ap:apId,hv:hvId||null,ttype:ttype,notes:notes,due:due};
-  const ok = await SB.addTask(tk);
-  if(!ok){toast$("Save failed",true);return;}
-  tk.status="open";tk.ts=new Date().toISOString();
-  DB.tk.push(tk);
-  closeModal("task-modal");toast$("Task added ✓");
+
+  if(selectedHvIds.length===0){
+    // All hives — one task with hv=null
+    const tk={id:uid(),ap:apId,hv:null,ttype:ttype,notes:notes,due:due};
+    const ok=await SB.addTask(tk);
+    if(!ok){toast$("Save failed",true);return;}
+    tk.status="open";tk.ts=new Date().toISOString();
+    DB.tk.push(tk);
+  } else {
+    // One task per selected hive
+    for(var i=0;i<selectedHvIds.length;i++){
+      const tk={id:uid(),ap:apId,hv:selectedHvIds[i],ttype:ttype,notes:notes,due:due};
+      const ok=await SB.addTask(tk);
+      if(ok){tk.status="open";tk.ts=new Date().toISOString();DB.tk.push(tk);}
+    }
+  }
+  closeModal("task-modal");
+  toast$("Task"+(selectedHvIds.length>1?" × "+selectedHvIds.length:"")+" added ✓");
   if(currentScreen==="home")renderHome();
   else if(currentScreen==="apiary")renderApiary();
+  else if(currentScreen==="hive")renderHive();
 }
 
 // ─── HOST UPDATE ─────────────────────────────────────────────────────────────
