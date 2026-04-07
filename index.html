@@ -236,6 +236,9 @@ a{text-decoration:none}
   <div class="pads" id="rep-body"></div>
 </div>
 
+<!-- ── SYNC BANNER ──────────────────────────────────────────────────────── -->
+<div id="sync-banner" style="display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:8px 16px;color:#fff;font-size:13px;font-family:sans-serif;font-weight:700;z-index:9998;align-items:center;justify-content:center;text-align:center"></div>
+
 <!-- ── NAV ─────────────────────────────────────────────────────────────── -->
 <div id="s-traps" class="screen">
   <div class="hdr">
@@ -628,9 +631,11 @@ const SB = {
     if(ev.jars_date)row.jars_date=ev.jars_date;
     if(ev.swarm_type)row.swarm_type=ev.swarm_type;
     if(ev.swarm_dest)row.swarm_dest=ev.swarm_dest;
+    // Offline: queue write
+    if(!isOnline){await queueWrite({type:"addEvent",data:row});updateSyncBanner();return true;}
     const {error} = await supa.from('events').insert(row);
     if (error) {
-      console.error('addEvent error:', error.message, error.details, error.hint, JSON.stringify(row));
+      console.error('addEvent error:', error.message, error.details, error.hint);
       alert('Save error: ' + error.message + '\n' + (error.details||''));
     }
     return !error;
@@ -642,14 +647,18 @@ const SB = {
       task_type: t.ttype, notes: t.notes || null,
       due_date: t.due, status: 'open',
     };
+    // Offline: queue write
+    if(!isOnline){await queueWrite({type:"addTask",data:row});updateSyncBanner();return true;}
     const {error} = await supa.from('tasks').insert(row);
     if (error) console.error('addTask error:', error);
     return !error;
   },
 
   async doneTask(id) {
+    const localDate = new Date();
+    const dateStr = localDate.getFullYear()+'-'+String(localDate.getMonth()+1).padStart(2,'0')+'-'+String(localDate.getDate()).padStart(2,'0');
     const {error} = await supa.from('tasks')
-      .update({status:'done', completed_at: new Date().toISOString().split('T')[0]})
+      .update({status:'done', completed_at: dateStr})
       .eq('id', id);
     if (error) console.error('doneTask error:', error);
     return !error;
@@ -678,6 +687,7 @@ const SB = {
     if (fields.feeder !== undefined)           mapped.feeder           = fields.feeder;
     const {error} = await supa.from('hives').update(mapped).eq('id', id);
     if (error) console.error('updateHive error:', error);
+    if(error&&!isOnline){await queueWrite({type:"updateHive",data:{id,fields}});updateSyncBanner();return true;}
     return !error;
   },
 
@@ -810,22 +820,174 @@ function mapEv(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.ty
 
 function mapTk(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,ttype:row.task_type,notes:row.notes,due:row.due_date,status:row.status,ts:row.created_at};}
 
+// ─── OFFLINE / SYNC SYSTEM ──────────────────────────────────────────────────
+var isOnline=navigator.onLine;
+var syncQueue=[];
+var IDB=null;
+
+function openIDB(){
+  return new Promise(function(resolve,reject){
+    var req=indexedDB.open("GreyLadyApiary",2);
+    req.onupgradeneeded=function(e){
+      var db=e.target.result;
+      if(!db.objectStoreNames.contains("cache"))db.createObjectStore("cache",{keyPath:"key"});
+      if(!db.objectStoreNames.contains("queue"))db.createObjectStore("queue",{keyPath:"id",autoIncrement:true});
+    };
+    req.onsuccess=function(e){resolve(e.target.result);};
+    req.onerror=function(){reject(req.error);};
+  });
+}
+async function idbSet(key,val){
+  if(!IDB)return;
+  return new Promise(function(resolve){
+    var tx=IDB.transaction("cache","readwrite");
+    tx.objectStore("cache").put({key:key,val:val});
+    tx.oncomplete=resolve;
+  });
+}
+async function idbGet(key){
+  if(!IDB)return null;
+  return new Promise(function(resolve){
+    var tx=IDB.transaction("cache","readonly");
+    var req=tx.objectStore("cache").get(key);
+    req.onsuccess=function(){resolve(req.result?req.result.val:null);};
+    req.onerror=function(){resolve(null);};
+  });
+}
+async function queueWrite(op){
+  if(!IDB)return;
+  return new Promise(function(resolve){
+    var tx=IDB.transaction("queue","readwrite");
+    tx.objectStore("queue").add(op);
+    tx.oncomplete=resolve;
+  });
+}
+async function getQueue(){
+  if(!IDB)return[];
+  return new Promise(function(resolve){
+    var tx=IDB.transaction("queue","readonly");
+    var req=tx.objectStore("queue").getAll();
+    req.onsuccess=function(){resolve(req.result||[]);};
+    req.onerror=function(){resolve([]);};
+  });
+}
+async function clearQueueItem(id){
+  if(!IDB)return;
+  return new Promise(function(resolve){
+    var tx=IDB.transaction("queue","readwrite");
+    tx.objectStore("queue").delete(id);
+    tx.oncomplete=resolve;
+  });
+}
+
+function updateSyncBanner(){
+  var el=document.getElementById("sync-banner");
+  if(!el)return;
+  getQueue().then(function(q){
+    if(!isOnline){
+      el.style.display="flex";
+      el.style.background="#b87820";
+      el.innerHTML='<span>⚡ Offline'+( q.length?" — "+q.length+" change"+(q.length!==1?"s":"")+" pending":"")+' — will sync when connected</span>';
+    } else if(q.length>0){
+      el.style.display="flex";
+      el.style.background="#2060a0";
+      el.innerHTML='<span>🔄 Syncing '+q.length+' pending change'+(q.length!==1?"s":"")+'…</span>';
+    } else {
+      el.style.display="none";
+    }
+  });
+}
+
+async function syncPendingWrites(){
+  if(!isOnline)return;
+  var q=await getQueue();
+  if(q.length===0){updateSyncBanner();return;}
+  updateSyncBanner();
+  for(var i=0;i<q.length;i++){
+    var op=q[i];
+    var ok=false;
+    try{
+      if(op.type==="addEvent")ok=await SB.addEvent(op.data);
+      else if(op.type==="addTask")ok=await SB.addTask(op.data);
+      else if(op.type==="doneTask")ok=await SB.doneTask(op.data.id);
+      else if(op.type==="delTask")ok=await SB.delTask(op.data.id);
+      else if(op.type==="updateHive")ok=await SB.updateHive(op.data.id,op.data.fields);
+      else if(op.type==="deleteEvent"){
+        const{error}=await supa.from("events").delete().eq("id",op.data.id);
+        ok=!error;
+      }
+      if(ok)await clearQueueItem(op.id);
+    }catch(e){console.error("Sync error:",e);break;}
+  }
+  updateSyncBanner();
+  if((await getQueue()).length===0){
+    toast$("✓ All changes synced");
+  }
+}
+
+window.addEventListener("online",function(){
+  isOnline=true;
+  updateSyncBanner();
+  syncPendingWrites();
+  // Refresh data from Supabase now that we're back online
+  SB.load().then(function(data){
+    if(!data)return;
+    DB.ap=data.ap.map(mapAp);
+    DB.hv=data.hv.map(mapHv);
+    DB.ev=data.ev.map(mapEv);
+    DB.tk=data.tk.map(mapTk);
+    DB.tr=data.tr||[];
+    idbSet("db",{ap:data.ap,hv:data.hv,ev:data.ev,tk:data.tk,tr:data.tr});
+    if(currentScreen)goScreen(currentScreen);
+  });
+});
+window.addEventListener("offline",function(){
+  isOnline=false;
+  updateSyncBanner();
+  toast$("⚡ Offline mode — changes saved locally");
+});
+
 async function initDB(){
   showLoading(true);
-  try {
-    const wasEmpty = await SB.seedIfEmpty(HOSTS);
-    const data = await SB.load();
-    DB.ap = data.ap.map(mapAp);
-    DB.hv = data.hv.map(mapHv);
-    DB.ev = data.ev.map(mapEv);
-    DB.tk = data.tk.map(mapTk);
-    DB.tr = data.tr || [];
-    console.log('Loaded:', DB.ap.length, 'apiaries,', DB.hv.length, 'hives,', DB.tr.length, 'traps');
-  } catch(e) {
-    console.error('DB load error:', e);
-    toast$('Connection error — check network', true);
+  try{IDB=await openIDB();}catch(e){console.warn("IDB unavailable:",e);}
+
+  if(isOnline){
+    try{
+      await SB.seedIfEmpty(HOSTS);
+      const data=await SB.load();
+      DB.ap=data.ap.map(mapAp);
+      DB.hv=data.hv.map(mapHv);
+      DB.ev=data.ev.map(mapEv);
+      DB.tk=data.tk.map(mapTk);
+      DB.tr=data.tr||[];
+      // Cache to IndexedDB for offline use
+      await idbSet("db",{ap:data.ap,hv:data.hv,ev:data.ev,tk:data.tk,tr:data.tr});
+      console.log("Loaded from Supabase and cached offline");
+      syncPendingWrites();
+    }catch(e){
+      console.error("Supabase load error:",e);
+      await loadFromCache();
+    }
+  } else {
+    await loadFromCache();
   }
+  updateSyncBanner();
   showLoading(false);
+}
+
+async function loadFromCache(){
+  const cached=await idbGet("db");
+  if(cached){
+    DB.ap=cached.ap.map(mapAp);
+    DB.hv=cached.hv.map(mapHv);
+    DB.ev=cached.ev.map(mapEv);
+    DB.tk=cached.tk.map(mapTk);
+    DB.tr=cached.tr||[];
+    console.log("Loaded from offline cache");
+    toast$("⚡ Offline — using cached data");
+  } else {
+    toast$("No cached data — connect to internet first","true");
+  }
 }
 
 function showLoading(on){
@@ -844,7 +1006,7 @@ function saveDB(){/* No-op: writes go directly to Supabase via SB.* functions */
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 function uid(){return Math.random().toString(36).slice(2,10);}
-function today(){return new Date().toISOString().split("T")[0];}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function fmtD(d){if(!d)return"—";return new Date(d+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"2-digit"});}
 function dAgo(d){if(!d)return null;const n=Math.floor((Date.now()-new Date(d+"T12:00:00"))/86400000);if(n===0)return"today";if(n===1)return"yesterday";return n+"d ago";}
 function isOD(d){return d&&d<today();}
@@ -1718,7 +1880,12 @@ function renderWorkplan(){
   function hiveContext(hv){
     if(!hv)return"";
     const yr=new Date().getFullYear();
-    const installEv=DB.ev.filter(function(e){return e.hv===hv.id&&e.type==="install";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+    const installEv=DB.ev.filter(function(e){
+      if(e.type!=="install")return false;
+      if(e.hv===hv.id)return true;
+      if(e.ap===hv.ap&&!e.hv)return true;
+      return false;
+    }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
     const survived=hv.winter_survived===true&&hv.winter_year===yr;
     if(installEv){
       const days=Math.floor((Date.now()-new Date(installEv.date+"T12:00:00"))/86400000);
@@ -2325,7 +2492,17 @@ function renderReports(){
   } else if(repTab==="breeds"){
     const total=DB.hv.length;
 
-    // Get all unique install dates for filter
+    // Helper: get install event for a hive (including apiary-level installs)
+    var getInstallEv=function(hv){
+      return DB.ev.filter(function(e){
+        if(e.type!=="install")return false;
+        if(e.hv===hv.id)return true;
+        if(e.ap===hv.ap&&!e.hv)return true;
+        return false;
+      }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+    };
+
+    // Get all unique install dates — include apiary-level events
     const installDates=[...new Set(DB.ev.filter(function(e){return e.type==="install"&&e.date;}).map(function(e){return e.date;}))].sort();
     const selectedDate=window._breedDateFilter||"all";
 
@@ -2341,11 +2518,17 @@ function renderReports(){
     });
     html+='</select></div>';
 
-    // Filter hives by selected date
+    // Filter hives by selected install date — check both hive-specific and apiary-level events
     let filteredHvs=DB.hv;
     if(selectedDate!=="all"){
-      const hivesOnDate=new Set(DB.ev.filter(function(e){return e.type==="install"&&e.date===selectedDate;}).map(function(e){return e.hv;}));
-      filteredHvs=DB.hv.filter(function(h){return hivesOnDate.has(h.id);});
+      filteredHvs=DB.hv.filter(function(h){
+        return DB.ev.some(function(e){
+          if(e.type!=="install"||e.date!==selectedDate)return false;
+          if(e.hv===h.id)return true;
+          if(e.ap===h.ap&&!e.hv)return true;
+          return false;
+        });
+      });
     }
     const filtTotal=filteredHvs.length;
     const filtBStats=BREEDS.map(function(b){
@@ -2375,7 +2558,7 @@ function renderReports(){
         html+='<div style="margin-top:10px;border-top:1px solid #c8bc98;padding-top:8px">';
         x.hvList.forEach(function(h){
           const ap=getAp(h.ap);
-          const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+          const installEv=getInstallEv(h);
           html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="setSelHvById(\''+h.id+'\');goScreen(\'hive\')">';
           html+='<div style="font-size:14px;color:#1a2e1a;font-weight:600">'+(ap?ap.addr:"")+" · Hive "+h.n+'</div>';
           html+='<div style="text-align:right">';
@@ -3987,4 +4170,14 @@ initDB().then(function(){
 });
 </script>
 </body>
+<script>
+// Register service worker for offline HTML caching
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/grey-lady-apiary/sw.js').then(function(){
+    console.log('Service worker registered');
+  }).catch(function(e){
+    console.log('SW registration failed (offline will still work via IndexedDB):', e);
+  });
+}
+</script>
 </html>
