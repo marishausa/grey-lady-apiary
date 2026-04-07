@@ -965,22 +965,26 @@ async function initDB(){
     try{
       await SB.seedIfEmpty(HOSTS);
       const data=await SB.load();
+      if(!data||!data.hv){throw new Error("No data returned from Supabase");}
       DB.ap=data.ap.map(mapAp);
       DB.hv=data.hv.map(mapHv);
       DB.ev=data.ev.map(mapEv);
       DB.tk=data.tk.map(mapTk);
       DB.tr=data.tr||[];
       // Cache each table separately to IndexedDB
-      await idbSet("db_ap", data.ap);
-      await idbSet("db_hv", data.hv);
-      await idbSet("db_ev", data.ev);
-      await idbSet("db_tk", data.tk);
-      await idbSet("db_tr", data.tr||[]);
-      await idbSet("db_cached_at", new Date().toISOString());
-      console.log("Cached offline: "+DB.hv.length+" hives, "+DB.ev.length+" events");
+      try{
+        await idbSet("db_ap", data.ap);
+        await idbSet("db_hv", data.hv);
+        await idbSet("db_ev", data.ev);
+        await idbSet("db_tk", data.tk);
+        await idbSet("db_tr", data.tr||[]);
+        await idbSet("db_cached_at", new Date().toISOString());
+        console.log("Cached offline: "+DB.hv.length+" hives, "+DB.ev.length+" events");
+      }catch(cacheErr){console.warn("Cache save failed:",cacheErr);}
       syncPendingWrites();
     }catch(e){
       console.error("Supabase load error:",e);
+      toast$("Connection error — trying offline cache",true);
       await loadFromCache();
     }
   } else {
@@ -1090,16 +1094,21 @@ function goScreen(s){
     btn.classList.toggle("active",btn.dataset.s===s||(s==="apiary"&&btn.dataset.s==="home")||(s==="hive"&&btn.dataset.s==="home")||(s==="hosts"&&btn.dataset.s==="home")||(s==="workplan"&&btn.dataset.s==="home"));
   });
   currentScreen=s;
-  if(s==="home")renderHome();
-  else if(s==="hosts")renderHosts();
-  else if(s==="apiary"&&selAp)renderApiary();
-  else if(s==="hive"&&selHv)renderHive();
-  else if(s==="workplan")renderWorkplan();
-  else if(s==="traps")renderTraps();
-  else if(s==="winter")renderWinterBulk();
-  else if(s==="map")initMap();
-  else if(s==="calendar")renderCalendar();
-  else if(s==="reports")renderReports();
+  try{
+    if(s==="home")renderHome();
+    else if(s==="hosts")renderHosts();
+    else if(s==="apiary"&&selAp)renderApiary();
+    else if(s==="hive"&&selHv)renderHive();
+    else if(s==="workplan")renderWorkplan();
+    else if(s==="traps")renderTraps();
+    else if(s==="winter")renderWinterBulk();
+    else if(s==="map")initMap();
+    else if(s==="calendar")renderCalendar();
+    else if(s==="reports")renderReports();
+  }catch(e){
+    console.error("Render error on screen '"+s+"':",e);
+    alert("Screen error: "+e.message);
+  }
 }
 
 // ─── HOME ────────────────────────────────────────────────────────────────────
