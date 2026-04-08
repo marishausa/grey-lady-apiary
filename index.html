@@ -3445,6 +3445,7 @@ function getSelectedHiveIds(){
   return cbs.filter(function(c){return c.checked;}).map(function(c){return c.value;});
 }
 async function saveLog(){
+  alert("saveLog called, saving="+window._saving);
   // Guard against double-tap
   if(window._saving){return;}
   window._saving=true;
