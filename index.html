@@ -258,17 +258,12 @@ a{text-decoration:none}
       <div class="modal-title">Add Swarm Trap</div>
       <button class="modal-close" onclick="closeModal('add-trap-modal')">×</button>
     </div>
+    <label class="lbl">Trap Name / Number</label>
+    <input class="inp" id="trap-name" placeholder="e.g. Trap 1, North Woods A, Milestone Rd #2">
     <label class="lbl">Location Description</label>
     <input class="inp" id="trap-location" placeholder="e.g. Madaket Rd near conservation land">
     <label class="lbl">Nearest Address / Landmark</label>
     <input class="inp" id="trap-addr" placeholder="e.g. Near 249 Madaket Rd">
-    <label class="lbl">Trap Type</label>
-    <select class="sel" id="trap-type">
-      <option value="box">Bait box / nuc box</option>
-      <option value="bag">Swarm bag</option>
-      <option value="log">Log / natural cavity</option>
-      <option value="other">Other</option>
-    </select>
     <label class="lbl">Lure Used</label>
     <select class="sel" id="trap-lure">
       <option value="lemongrass">Lemongrass oil</option>
@@ -4017,6 +4012,7 @@ async function quickWinter(hid,survived){
 let editingTrapId = null;
 
 function renderTraps(){
+  const ready=DB.tr.filter(function(t){return t.status==="ready";});
   const active=DB.tr.filter(function(t){return t.status==="active";});
   const caught=DB.tr.filter(function(t){return t.status==="caught";});
   const retired=DB.tr.filter(function(t){return t.status==="retired";});
@@ -4030,13 +4026,13 @@ function renderTraps(){
   let html='';
 
   // Summary stats
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">';
-  html+=scCard("🪤",active.length,"Active","#3a7d44");
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px">';
+  html+=scCard("📦",ready.length,"Ready","#8a9e80");
+  html+=scCard("🪤",active.length,"Deployed","#3a7d44");
   html+=scCard("⚠️",overdue.length,"Check Now","#b83030");
   html+=scCard("🐝",caught.length,"Caught","#b87820");
   html+='</div>';
 
-  // Overdue checks banner
   if(overdue.length>0){
     html+='<div style="background:#c0392b;border-radius:14px;padding:14px;margin-bottom:14px;color:#fff">';
     html+='<div style="font-size:17px;font-weight:800">⚠️ '+overdue.length+' trap'+(overdue.length>1?"s":"")+" overdue for check</div>";
@@ -4044,27 +4040,28 @@ function renderTraps(){
     html+='</div>';
   }
 
-  // Active traps
-  if(active.length===0&&caught.length===0){
+  if(ready.length===0&&active.length===0&&caught.length===0){
     html+='<div class="card" style="text-align:center;padding:32px 16px">';
     html+='<div style="font-size:40px;margin-bottom:10px">🪤</div>';
     html+='<div style="font-size:18px;font-weight:700;margin-bottom:6px">No traps yet</div>';
-    html+='<div style="font-size:15px;color:#4a6040;font-family:sans-serif">Tap + Add Trap to place your first swarm trap</div>';
+    html+='<div style="font-size:15px;color:#4a6040;font-family:sans-serif">Tap + Add Trap to register your bait boxes</div>';
     html+='</div>';
   }
 
+  if(ready.length>0){
+    html+='<div class="sec">Ready for Season ('+ready.length+')</div>';
+    ready.forEach(function(t){ html+=trapCardHTML(t); });
+  }
   if(active.length>0){
-    html+='<div class="sec">Active Traps ('+active.length+')</div>';
+    html+='<div class="sec">Deployed in Field ('+active.length+')</div>';
     active.forEach(function(t){ html+=trapCardHTML(t); });
   }
-
   if(caught.length>0){
-    html+='<div class="sec" style="margin-top:8px">Swarms Caught This Season ('+caught.length+')</div>';
+    html+='<div class="sec" style="margin-top:8px">Swarms Caught ('+caught.length+')</div>';
     caught.forEach(function(t){ html+=trapCardHTML(t); });
   }
-
   if(retired.length>0){
-    html+='<div class="sec" style="margin-top:8px">Retired Traps ('+retired.length+')</div>';
+    html+='<div class="sec" style="margin-top:8px">Retired ('+retired.length+')</div>';
     retired.forEach(function(t){ html+=trapCardHTML(t); });
   }
 
@@ -4076,24 +4073,29 @@ function trapCardHTML(t){
   const daysSince=last?Math.floor((Date.now()-new Date(last+"T12:00:00"))/86400000):null;
   const interval=t.check_interval||7;
   const overdue=daysSince!==null&&daysSince>=interval;
-  const statusColors={active:"#3a7d44",caught:"#b87820",retired:"#8a9e80"};
-  const statusLabels={active:"Active",caught:"Swarm Caught!",retired:"Retired"};
+  const statusColors={ready:"#8a9e80",active:"#3a7d44",caught:"#b87820",retired:"#aaaaaa"};
+  const statusLabels={ready:"📦 Ready",active:"🪤 Deployed",caught:"🐝 Swarm Caught!",retired:"Retired"};
   const col=statusColors[t.status]||"#3a7d44";
 
   let h='<div class="card" style="border-left:4px solid '+col+';margin-bottom:12px">';
-  // Header row
   h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
   h+='<div style="flex:1">';
-  h+='<div style="font-size:17px;font-weight:700;color:#1a2e1a">🪤 '+escHtml(t.location||"Trap")+'</div>';
-  if(t.nearest_addr)h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif">📍 '+escHtml(t.nearest_addr)+'</div>';
+  // Show name if set, otherwise location
+  if(t.label){
+    h+='<div style="font-size:18px;font-weight:800;color:#1a2e1a">🪤 '+escHtml(t.label)+'</div>';
+    h+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif;margin-top:2px">'+escHtml(t.location||"")+'</div>';
+  } else {
+    h+='<div style="font-size:17px;font-weight:700;color:#1a2e1a">🪤 '+escHtml(t.location||"Trap")+'</div>';
+  }
+  if(t.nearest_addr)h+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif">📍 '+escHtml(t.nearest_addr)+'</div>';
   h+='</div>';
   h+='<span class="pill" style="background:'+col+'20;border:1.5px solid '+col+'50;color:'+col+'">'+statusLabels[t.status||"active"]+'</span>';
   h+='</div>';
 
-  // Details
+  // Details — bait box only, show lure and date
   h+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-family:sans-serif;font-size:13px;color:#8a9e80">';
-  if(t.trap_type)h+='<span>📦 '+t.trap_type+'</span>';
-  if(t.lure)h+='<span>🍋 '+t.lure+'</span>';
+  h+='<span>📦 Bait box</span>';
+  if(t.lure&&t.lure!=="none")h+='<span>🍋 '+t.lure+'</span>';
   if(t.date_set)h+='<span>📅 Set '+fmtD(t.date_set)+'</span>';
   h+='</div>';
 
@@ -4116,14 +4118,17 @@ function trapCardHTML(t){
   if(t.destination)h+='<div style="font-size:14px;font-family:sans-serif;color:#4a6040;margin-bottom:6px">→ '+escHtml(t.destination)+'</div>';
   if(t.notes)h+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif;margin-bottom:8px">'+escHtml(t.notes)+'</div>';
 
-  // Action buttons
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  if(t.status==="ready"){
+    h+='<button onclick="setTrapStatus(\''+t.id+'\',\'active\')" style="flex:2;padding:10px;background:#3a7d44;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif">🪤 Deploy in Field</button>';
+  }
   if(t.status==="active"){
     h+='<button onclick="checkTrap(\''+t.id+'\')" style="flex:2;padding:10px;background:'+(overdue?"#c0392b":"#3a7d44")+';border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif">'+(overdue?"⚠️ Check Now":"✓ Checked — Empty")+'</button>';
     h+='<button onclick="openSwarmCaughtModal(\''+t.id+'\')" style="flex:2;padding:10px;background:#b87820;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif">🐝 Swarm!</button>';
+    h+='<button onclick="setTrapStatus(\''+t.id+'\',\'ready\')" style="padding:10px 12px;background:#eee9db;border:1.5px solid #c8bc98;border-radius:10px;color:#8a9e80;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif">↩ Store</button>';
   }
-  h+='<button onclick="editTrap(\''+t.id+'\')" style="padding:10px 12px;background:#eee9db;border:1.5px solid #c8bc98;border-radius:10px;color:#4a6040;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif">✏️ Edit</button>';
-  h+='<button onclick="deleteTrap(\''+t.id+'\')" style="padding:10px 12px;background:#fdecea;border:1.5px solid rgba(184,48,48,.3);border-radius:10px;color:#b83030;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif">🗑 Delete</button>';
+  h+='<button onclick="editTrap(\''+t.id+'\')" style="padding:10px 12px;background:#eee9db;border:1.5px solid #c8bc98;border-radius:10px;color:#4a6040;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif">✏️</button>';
+  h+='<button onclick="deleteTrap(\''+t.id+'\')" style="padding:10px 12px;background:#fdecea;border:1.5px solid rgba(184,48,48,.3);border-radius:10px;color:#b83030;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif">🗑</button>';
   if(t.lat&&t.lng){
     const murl="https://www.google.com/maps/search/?api=1&query="+t.lat+","+t.lng;
     h+='<a href="'+murl+'" target="_blank" style="padding:10px 12px;background:#2060a0;border-radius:10px;color:#fff;font-size:13px;font-family:sans-serif;font-weight:700;display:flex;align-items:center">🗺</a>';
@@ -4134,41 +4139,61 @@ function trapCardHTML(t){
 
 function openAddTrapModal(){
   document.getElementById("trap-date").value=today();
+  document.getElementById("trap-name").value="";
   document.getElementById("trap-location").value="";
   document.getElementById("trap-addr").value="";
   document.getElementById("trap-notes").value="";
+  document.querySelector("#add-trap-modal .modal-title").textContent="Add Swarm Trap";
+  window._editTrapId=null;
   openModal("add-trap-modal");
 }
 
 async function saveTrap(){
   const location=document.getElementById("trap-location").value.trim();
   if(!location){toast$("Enter a location description",true);return;}
+  const name=document.getElementById("trap-name").value.trim();
+  const displayName=name||(location.slice(0,20));
   const trap={
-    id: uid(),
+    id: window._editTrapId||uid(),
     location: location,
     nearest_addr: document.getElementById("trap-addr").value,
-    trap_type: document.getElementById("trap-type").value,
+    trap_type: "box",
     lure: document.getElementById("trap-lure").value,
     date_set: document.getElementById("trap-date").value,
     check_interval: parseInt(document.getElementById("trap-interval").value),
-    notes: document.getElementById("trap-notes").value,
-    status: "active",
+    notes: (name?"["+name+"] ":"")+document.getElementById("trap-notes").value,
+    status: "ready",
     created_at: new Date().toISOString(),
     last_checked: null,
+    label: name||null,
   };
+  if(window._editTrapId){
+    const ok=await SB.updateTrap(window._editTrapId,trap);
+    if(!ok){toast$("Save failed",true);return;}
+    DB.tr=DB.tr.map(function(t){return t.id===window._editTrapId?Object.assign({},t,trap):t;});
+    closeModal("add-trap-modal");
+    toast$("Trap updated ✓");
+    renderTraps();
+    return;
+  }
   const ok=await SB.addTrap(trap);
   if(!ok){toast$("Save failed",true);return;}
   DB.tr.unshift(trap);
-  // Create first check task
   const dt=new Date(trap.date_set+"T12:00:00");
   dt.setDate(dt.getDate()+trap.check_interval);
-  await SB.addTask({id:uid(),ap:null,hv:null,ttype:"note",notes:"Check swarm trap: "+location,due:dt.toISOString().split("T")[0]});
-  DB.tk.push({id:uid(),ap:null,hv:null,ttype:"note",notes:"Check swarm trap: "+location,due:dt.toISOString().split("T")[0],status:"open",ts:new Date().toISOString()});
+  await SB.addTask({id:uid(),ap:null,hv:null,ttype:"note",notes:"Check swarm trap: "+displayName,due:dt.toISOString().split("T")[0]});
   closeModal("add-trap-modal");
   toast$("Trap added ✓ — check task created");
   renderTraps();
 }
 
+async function setTrapStatus(id,status){
+  await SB.updateTrap(id,{status:status});
+  DB.tr=DB.tr.map(function(t){return t.id!==id?t:Object.assign({},t,{status:status});});
+  const labels={ready:"📦 Stored — ready for season",active:"🪤 Deployed in field",retired:"Retired"};
+  toast$(labels[status]||status);
+  renderTraps();
+}
 async function checkTrap(id){
   const today2=today();
   await SB.updateTrap(id,{last_checked:today2});
@@ -4204,17 +4229,17 @@ async function deleteTrap(id){
 function editTrap(id){
   const t=DB.tr.find(function(x){return x.id===id;});
   if(!t)return;
-  editingTrapId=id;
+  window._editTrapId=id;
+  document.getElementById("trap-name").value=t.label||"";
   document.getElementById("trap-location").value=t.location||"";
   document.getElementById("trap-addr").value=t.nearest_addr||"";
-  document.getElementById("trap-type").value=t.trap_type||"box";
   document.getElementById("trap-lure").value=t.lure||"lemongrass";
   document.getElementById("trap-date").value=t.date_set||today();
   document.getElementById("trap-interval").value=String(t.check_interval||7);
-  document.getElementById("trap-notes").value=t.notes||"";
+  document.getElementById("trap-notes").value=(t.notes||"").replace(/^\[[^\]]+\]\s*/,"");
   document.querySelector("#add-trap-modal .modal-title").textContent="Edit Swarm Trap";
   document.querySelector("#add-trap-modal .btn-big").textContent="✓ Save Changes";
-  document.querySelector("#add-trap-modal .btn-big").setAttribute("onclick","saveEditTrap()");
+  document.querySelector("#add-trap-modal .btn-big").setAttribute("onclick","saveTrap()");
   openModal("add-trap-modal");
 }
 
