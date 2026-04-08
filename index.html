@@ -3409,15 +3409,16 @@ function logApChanged(){
     wrap.innerHTML='<select class="sel" id="log-hv"><option value="">— All hives —</option></select>';
     return;
   }
-  // Multi-select checkboxes
   var html='<div style="border:1.5px solid #c8bc98;border-radius:10px;overflow:hidden;margin-bottom:2px">';
-  // All hives option
-  html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f0f7f0;border-bottom:1px solid #e0e8d8;cursor:pointer">';
-  html+='<input type="checkbox" id="log-hv-all" onchange="logHvAllToggle(this)" style="width:18px;height:18px;cursor:pointer">';
-  html+='<span style="font-size:15px;font-weight:700;color:#2d4a2d">All '+hvs.length+' hives</span>';
-  html+='</label>';
-  // Individual hives
+  // Only show "All hives" option when there are 2+ hives
+  if(hvs.length>1){
+    html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f0f7f0;border-bottom:1px solid #e0e8d8;cursor:pointer">';
+    html+='<input type="checkbox" id="log-hv-all" onchange="logHvAllToggle(this)" style="width:18px;height:18px;cursor:pointer">';
+    html+='<span style="font-size:15px;font-weight:700;color:#2d4a2d">All '+hvs.length+' hives</span>';
+    html+='</label>';
+  }
   hvs.forEach(function(h){
+    // Auto-check if only 1 hive at location
     var autoCheck=hvs.length===1?" checked":"";
     html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eee9db;cursor:pointer;background:#fff">';
     html+='<input type="checkbox" class="log-hv-cb" value="'+h.id+'" onchange="logHvCbChanged()" style="width:18px;height:18px;cursor:pointer"'+autoCheck+'>';
@@ -3426,7 +3427,7 @@ function logApChanged(){
   });
   html+='</div>';
   wrap.innerHTML=html;
-  if(hvs.length===1)logHvCbChanged();
+  // Don't call logHvCbChanged for single hive — would incorrectly mark "all hives"
 }
 function logHvAllToggle(cb){
   const checked=cb.checked;
@@ -3649,10 +3650,12 @@ function taskApChanged(){
     return;
   }
   var html='<div style="border:1.5px solid #c8bc98;border-radius:10px;overflow:hidden;margin-bottom:2px">';
-  html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f0f7f0;border-bottom:1px solid #e0e8d8;cursor:pointer">';
-  html+='<input type="checkbox" id="task-hv-all" onchange="taskHvAllToggle(this)" style="width:18px;height:18px;cursor:pointer">';
-  html+='<span style="font-size:15px;font-weight:700;color:#2d4a2d">All '+hvs.length+' hives</span>';
-  html+='</label>';
+  if(hvs.length>1){
+    html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f0f7f0;border-bottom:1px solid #e0e8d8;cursor:pointer">';
+    html+='<input type="checkbox" id="task-hv-all" onchange="taskHvAllToggle(this)" style="width:18px;height:18px;cursor:pointer">';
+    html+='<span style="font-size:15px;font-weight:700;color:#2d4a2d">All '+hvs.length+' hives</span>';
+    html+='</label>';
+  }
   hvs.forEach(function(h){
     var autoCheck=hvs.length===1?" checked":"";
     html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eee9db;cursor:pointer;background:#fff">';
@@ -3662,7 +3665,7 @@ function taskApChanged(){
   });
   html+='</div>';
   wrap.innerHTML=html;
-  if(hvs.length===1)taskHvCbChanged();
+  // Don't call taskHvCbChanged for single hive
 }
 function taskHvAllToggle(cb){
   document.querySelectorAll(".task-hv-cb").forEach(function(c){c.checked=cb.checked;});
