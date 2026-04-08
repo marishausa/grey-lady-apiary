@@ -3235,12 +3235,10 @@ function openLogModal(data){
   
   if(data.ap){logApChanged();}
   if(data.hv){
-    // Pre-select specific hive checkbox
-    setTimeout(function(){
-      const cb=document.querySelector('.log-hv-cb[value="'+data.hv+'"]');
-      if(cb){cb.checked=true;logHvCbChanged();}
-      else{const sel=document.getElementById("log-hv");if(sel)sel.value=data.hv;}
-    },50);
+    // Pre-select specific hive checkbox after checkboxes are rendered
+    const cb=document.querySelector('.log-hv-cb[value="'+data.hv+'"]');
+    if(cb){cb.checked=true;logHvCbChanged();}
+    else{const sel=document.getElementById("log-hv");if(sel)sel.value=data.hv;}
   }
   if(data.breed){
     // Will be set after install fields render
@@ -3414,13 +3412,15 @@ function logApChanged(){
   html+='</label>';
   // Individual hives
   hvs.forEach(function(h){
+    var autoCheck=hvs.length===1?" checked":"";
     html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eee9db;cursor:pointer;background:#fff">';
-    html+='<input type="checkbox" class="log-hv-cb" value="'+h.id+'" onchange="logHvCbChanged()" style="width:18px;height:18px;cursor:pointer">';
-    html+='<span style="font-size:14px;color:#1a2e1a">Hive '+h.n+(h.breed?' <span style="color:#8a9e80;font-size:12px">('+h.breed+')</span>':'')+'</span>';
+    html+='<input type="checkbox" class="log-hv-cb" value="'+h.id+'" onchange="logHvCbChanged()" style="width:18px;height:18px;cursor:pointer"'+autoCheck+'>';
+    html+='<span style="font-size:14px;color:#1a2e1a">'+hvNameFull(h)+(h.breed?' <span style="color:#8a9e80;font-size:12px">('+h.breed+')</span>':'')+'</span>';
     html+='</label>';
   });
   html+='</div>';
   wrap.innerHTML=html;
+  if(hvs.length===1)logHvCbChanged();
 }
 function logHvAllToggle(cb){
   const checked=cb.checked;
@@ -3448,12 +3448,8 @@ async function saveLog(){
   const apId=document.getElementById("log-ap").value;
   if(!apId){toast$("Select a host",true);return;}
   const selectedHvIds=getSelectedHiveIds();
-  // If none selected and not "all", prompt
-  if(selectedHvIds!==null&&selectedHvIds.length===0){
-    // Check if any checkboxes exist but none are ticked
-    const cbs=document.querySelectorAll(".log-hv-cb");
-    if(cbs.length>0){toast$("Select at least one hive",true);return;}
-  }
+  // If no checkboxes exist or none selected, treat as "all hives" (null hive_id)
+  // Don't block — just proceed with apiary-level event
   const date=document.getElementById("log-date").value;
   const notes=document.getElementById("log-notes").value;
   const followup=document.getElementById("log-followup").value;
@@ -3664,13 +3660,15 @@ function taskApChanged(){
   html+='<span style="font-size:15px;font-weight:700;color:#2d4a2d">All '+hvs.length+' hives</span>';
   html+='</label>';
   hvs.forEach(function(h){
+    var autoCheck=hvs.length===1?" checked":"";
     html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eee9db;cursor:pointer;background:#fff">';
-    html+='<input type="checkbox" class="task-hv-cb" value="'+h.id+'" onchange="taskHvCbChanged()" style="width:18px;height:18px;cursor:pointer">';
-    html+='<span style="font-size:14px;color:#1a2e1a">Hive '+h.n+(h.breed?' <span style="color:#8a9e80;font-size:12px">('+h.breed+')</span>':'')+'</span>';
+    html+='<input type="checkbox" class="task-hv-cb" value="'+h.id+'" onchange="taskHvCbChanged()" style="width:18px;height:18px;cursor:pointer"'+autoCheck+'>';
+    html+='<span style="font-size:14px;color:#1a2e1a">'+hvNameFull(h)+(h.breed?' <span style="color:#8a9e80;font-size:12px">('+h.breed+')</span>':'')+'</span>';
     html+='</label>';
   });
   html+='</div>';
   wrap.innerHTML=html;
+  if(hvs.length===1)taskHvCbChanged();
 }
 function taskHvAllToggle(cb){
   document.querySelectorAll(".task-hv-cb").forEach(function(c){c.checked=cb.checked;});
