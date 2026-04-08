@@ -1045,7 +1045,7 @@ function hvTk(hid){
     return false;
   });
 }
-function apEv(aid){return DB.ev.filter(function(e){return e.ap===aid;}).sort(function(a,b){return b.date.localeCompare(a.date);});}
+function apEv(aid){return DB.ev.filter(function(e){return e.ap===aid;}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});}
 function hvEv(hid){
   const h=DB.hv.find(function(x){return x.id===hid;});
   const apId=h?h.ap:null;
@@ -1058,7 +1058,7 @@ function hvEv(hid){
       return true;
     }
     return false;
-  }).sort(function(a,b){return b.date.localeCompare(a.date);});
+  }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
 }
 function lastEv(hid,type){
   const h=DB.hv.find(function(x){return x.id===hid;});
@@ -1072,7 +1072,7 @@ function lastEv(hid,type){
       return true;
     }
     return false;
-  }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+  }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
 }
 function openTasks(){return DB.tk.filter(function(t){return t.status==="open";});}
 
@@ -1186,7 +1186,7 @@ function renderHome(){
   document.getElementById("home-today-tasks").innerHTML=html;
   
   let rhtml="";
-  const recent=DB.ev.slice().sort(function(a,b){return b.ts.localeCompare(a.ts);}).slice(0,4);
+  const recent=DB.ev.slice().sort(function(a,b){return(b.ts||b.date||"").localeCompare(a.ts||a.date||"");}).slice(0,4);
   if(recent.length>0){
     rhtml='<div class="sec">Recent Activity</div>';
     recent.forEach(function(ev){rhtml+=eventRowHTML(ev,true);});
@@ -1421,12 +1421,12 @@ function renderHive(){
   hero+='</div>';
   document.getElementById("hive-hero").innerHTML=hero;
 
-  const evts=hvEv(h.id).sort(function(a,b){return b.date.localeCompare(a.date);});
+  const evts=hvEv(h.id).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
   const tasks=hvTk(h.id);
   const li=lastEv(h.id,"inspection");
   const lf=lastEv(h.id,"feeding");
   const lt=lastEv(h.id,"treatment");
-  const installEv=evts.filter(function(e){return e.type==="install";}).sort(function(a,b){return a.date.localeCompare(b.date);})[0];
+  const installEv=evts.filter(function(e){return e.type==="install";}).sort(function(a,b){return (a.date||"").localeCompare(b.date||"");})[0];
 
   let body="";
 
@@ -1496,8 +1496,8 @@ function renderHive(){
   // Boxes from equipment log events — each box add is an event
   // ── BOX TRACKING ─────────────────────────────────────────────────────────
   // Boxes from equipment log (box_ prefix) AND inspection boxes_added field
-  const boxEquipEvts=evts.filter(function(e){return e.type==="equipment"&&e.equip_type&&e.equip_type.startsWith("box_");}).sort(function(a,b){return a.date.localeCompare(b.date);});
-  const boxInspEvts=evts.filter(function(e){return e.type==="inspection"&&e.boxes_added&&parseInt(e.boxes_added)!==0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  const boxEquipEvts=evts.filter(function(e){return e.type==="equipment"&&e.equip_type&&e.equip_type.startsWith("box_");}).sort(function(a,b){return (a.date||"").localeCompare(b.date||"");});
+  const boxInspEvts=evts.filter(function(e){return e.type==="inspection"&&e.boxes_added&&parseInt(e.boxes_added)!==0;}).sort(function(a,b){return (a.date||"").localeCompare(b.date||"");});
   const startBoxCount=h.box_count||2;
   const startBoxType=h.box_types||"medium";
   // Parse box_types — could be JSON array ["winter","medium","medium"] or simple string
@@ -1522,7 +1522,7 @@ function renderHive(){
     var btype=e.box_type||startBoxType;
     allBoxChanges.push({date:e.date,type:btype,action:n>0?"installed":"removed",count:Math.abs(n),label:fmtD(e.date)+' (inspection)'});
   });
-  allBoxChanges.sort(function(a,b){return a.date.localeCompare(b.date);});
+  allBoxChanges.sort(function(a,b){return (a.date||"").localeCompare(b.date||"");});
   allBoxChanges.forEach(function(e){
     if(e.action==="installed"){
       var cnt=e.count||1;
@@ -1963,7 +1963,7 @@ function renderWorkplan(){
       if(e.hv===hv.id)return true;
       if(e.ap===hv.ap&&!e.hv)return true;
       return false;
-    }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+    }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
     const survived=hv.winter_survived===true&&hv.winter_year===yr;
     if(installEv){
       const days=Math.floor((Date.now()-new Date(installEv.date+"T12:00:00"))/86400000);
@@ -2413,7 +2413,7 @@ function renderReports(){
     const li=lastEv(h.id,"inspection");
     // If never inspected, check install date — new packages get grace period
     if(!li){
-      const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+      const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
       if(installEv){
         const daysSinceInstall=Math.floor((Date.now()-new Date(installEv.date+"T12:00:00"))/86400000);
         return daysSinceInstall>7; // Only flag after 7 days from install
@@ -2492,7 +2492,7 @@ function renderReports(){
       html+='<div class="sec">Overdue Inspections ('+oi.length+')</div>';
       oi.slice(0,8).forEach(function(h){
         const ap=getAp(h.ap);const li=lastEv(h.id,"inspection");
-        const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+        const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
         html+='<div class="tcard" onclick="openHive(\''+h.id+'\')">';
         html+='<div style="font-size:16px;font-weight:700">'+(ap?ap.addr:"")+" · "+hvNameFull(h)+'</div>';
         html+='<div style="font-size:14px;color:#4a6040;font-family:sans-serif">';
@@ -2506,7 +2506,7 @@ function renderReports(){
 
   // ── FEEDING ───────────────────────────────────────────────────────────────
   } else if(repTab==="feeding"){
-    const allFeeds=DB.ev.filter(function(e){return e.type==="feeding";}).sort(function(a,b){return b.date.localeCompare(a.date);});
+    const allFeeds=DB.ev.filter(function(e){return e.type==="feeding";}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
     const weekFeeds=wev.filter(function(e){return e.type==="feeding";});
     const fedAps=new Set(allFeeds.map(function(e){return e.ap;}));
     const feedSubTab=window._feedSub||"need";
@@ -2600,7 +2600,7 @@ function renderReports(){
         if(e.hv===hv.id)return true;
         if(e.ap===hv.ap&&!e.hv)return true;
         return false;
-      }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+      }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
     };
 
     // Get all unique install dates — include apiary-level events
@@ -2745,7 +2745,7 @@ function renderReports(){
     }
 
     // Swarm section
-    const swarmEvs=DB.ev.filter(function(e){return e.type==="swarm";}).sort(function(a,b){return b.date.localeCompare(a.date);});
+    const swarmEvs=DB.ev.filter(function(e){return e.type==="swarm";}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
     const mo2=new Date().getMonth();
     const swarmSeason=mo2>=3&&mo2<=6;
 
@@ -2762,7 +2762,7 @@ function renderReports(){
       const li=lastEv(h.id,"inspection");
       const daysSince=li?Math.floor((Date.now()-new Date(li.date+"T12:00:00"))/86400000):999;
       // New install grace period — don't flag as swarm risk until 14 days after install
-      const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+      const installEv=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="install";}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
       if(installEv){
         const daysSinceInstall=Math.floor((Date.now()-new Date(installEv.date+"T12:00:00"))/86400000);
         if(daysSinceInstall<14)return false; // New package — not a swarm risk yet
@@ -2873,7 +2873,7 @@ function renderReports(){
         // Use breed from BEFORE this season — find last install before this year
         const preInstall=DB.ev.filter(function(e){
           return e.hv===h.id&&e.type==="install"&&e.date<yr+"-01-01"&&e.breed;
-        }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+        }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
         const winterBreed=preInstall?preInstall.breed:(h.breed||"Unknown breed");
         if(!byBreed[winterBreed])byBreed[winterBreed]=[];
         byBreed[winterBreed].push({h:h,breed:winterBreed});
@@ -2909,7 +2909,7 @@ function renderReports(){
         // Find breed from BEFORE this season
         const preInstall=DB.ev.filter(function(e){
           return e.hv===h.id&&e.type==="install"&&e.date<yr+"-01-01"&&e.breed;
-        }).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+        }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
         const winterBreed=preInstall?preInstall.breed:null;
         // Check if hive was later reinstalled this season
         const reinstalled=DB.ev.some(function(e){return e.hv===h.id&&e.type==="install"&&e.date>=yr+"-01-01";});
@@ -3228,7 +3228,7 @@ function runHiveFinder(key){
   else if(k==="queen_excluder")results=DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="queen_excluder";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});
   else if(k==="winter_blanket")results=DB.hv.filter(function(h){const ins=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="equipment"&&e.equip_type==="winter_blanket";});return ins.filter(function(e){return e.equip_action==="installed";}).length>ins.filter(function(e){return e.equip_action==="removed";}).length;});
   else if(k==="three_boxes")results=DB.hv.filter(function(h){const be=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection"&&e.boxes_added;});return 2+be.reduce(function(s,e){return s+parseInt(e.boxes_added||0);},0)>=3;});
-  else if(k==="queen_cells")results=DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];return li&&li.queen_cells===true;});
+  else if(k==="queen_cells")results=DB.hv.filter(function(h){const li=DB.ev.filter(function(e){return e.hv===h.id&&e.type==="inspection";}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];return li&&li.queen_cells===true;});
   else if(k==="strong")results=DB.hv.filter(function(h){return h.str==="Strong";});
   else if(k==="solid_board")results=DB.hv.filter(function(h){return h.bottom_board==="solid";});
   else if(k==="screened_board")results=DB.hv.filter(function(h){return h.bottom_board==="screened";});
