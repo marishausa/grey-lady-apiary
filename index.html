@@ -3433,16 +3433,16 @@ function logHvCbChanged(){
   if(allCb)allCb.checked=checked.length===all.length;
 }
 function getSelectedHiveIds(){
-  // Returns array of selected hive IDs, or empty array for "all hives"
   const allCb=document.getElementById("log-hv-all");
   const cbs=[...document.querySelectorAll(".log-hv-cb")];
   if(cbs.length===0){
-    // Fallback to old single select
+    // Fallback: old single select
     const sel=document.getElementById("log-hv");
-    return sel?[sel.value]:[];
+    const val=sel?sel.value:"";
+    return val?[val]:[];  // empty string = all hives
   }
   if(allCb&&allCb.checked)return[]; // empty = all hives
-  return cbs.filter(function(c){return c.checked;}).map(function(c){return c.value;});
+  return cbs.filter(function(c){return c.checked&&c.value;}).map(function(c){return c.value;});
 }
 async function saveLog(){
   // Guard against double-tap
@@ -3453,12 +3453,8 @@ async function saveLog(){
 
   try{
   const apId=document.getElementById("log-ap").value;
-  alert("step1: apId="+apId+", logType="+logType);
   if(!apId){toast$("Select a host",true);window._saving=false;if(saveBtn){saveBtn.disabled=false;saveBtn.textContent="✓ Save";}return;}
   const selectedHvIds=getSelectedHiveIds();
-  alert("step2: selectedHvIds="+JSON.stringify(selectedHvIds));
-  // If no checkboxes exist or none selected, treat as "all hives" (null hive_id)
-  // Don't block — just proceed with apiary-level event
   const date=document.getElementById("log-date").value;
   const notes=document.getElementById("log-notes").value;
   const followup=document.getElementById("log-followup").value;
@@ -3526,12 +3522,10 @@ async function saveLog(){
   // Determine which hives to save for
   // selectedHvIds: [] = all hives (apiary-level), ['id1','id2'] = specific hives
   var hvIdsToSave=selectedHvIds;
-  alert("step3: about to save, hvIdsToSave="+JSON.stringify(hvIdsToSave));
   // If "All hives" checked (empty array) → save one event with hv=null
   if(hvIdsToSave.length===0){
     ev.id=uid();ev.hv=null;
     const ok=await SB.addEvent(ev);
-    alert("step4a: all-hives save ok="+ok);
     if(!ok){toast$("Save failed — check connection",true);return;}
     ev.ts=new Date().toISOString();
     DB.ev.unshift(Object.assign({},ev));
@@ -3540,14 +3534,12 @@ async function saveLog(){
     for(var si=0;si<hvIdsToSave.length;si++){
       const hvEv2=Object.assign({},ev,{id:uid(),hv:hvIdsToSave[si]});
       const ok=await SB.addEvent(hvEv2);
-      alert("step4b: hive "+hvIdsToSave[si]+" save ok="+ok);
       if(ok){DB.ev.unshift(Object.assign({},hvEv2));saved++;}
     }
     if(saved===0){toast$("Save failed — check connection",true);return;}
     ev.hv=hvIdsToSave[hvIdsToSave.length-1];
     ev.id=uid();
   }
-  alert("step5: save done, about to close modal");
 
   // ── CLOSE MODAL IMMEDIATELY after save ────────────────────────────────────
   logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";
