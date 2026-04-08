@@ -2632,17 +2632,19 @@ function renderReports(){
       });
     }
     const filtTotal=filteredHvs.length;
-    const filtBStats=BREEDS.map(function(b){
+    const filtBStats=BREEDS.filter(function(b){return b!=="Unknown";}).map(function(b){
       const hvs=filteredHvs.filter(function(h){return h.breed===b;});
       return{b:b,cnt:hvs.length,hvList:hvs};
     }).filter(function(x){return x.cnt>0;}).sort(function(a,b){return b.cnt-a.cnt;});
-    const filtUnknown=filteredHvs.filter(function(h){return !h.breed;}).length;
+    // Unknown = explicit "Unknown" breed OR null/empty breed
+    const unknownHvs=filteredHvs.filter(function(h){return !h.breed||h.breed==="Unknown";});
+    const filtUnknown=unknownHvs.length;
 
     if(selectedDate!=="all"){
       html+='<div style="background:#d4e8d0;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-family:sans-serif;font-size:14px;color:#2d6035;font-weight:600">📦 Showing '+filtTotal+' hives installed on '+fmtD(selectedDate)+'</div>';
     }
 
-    if(filtBStats.length>0){
+    if(filtBStats.length>0||filtUnknown>0){
       html+='<div class="sec">Breed Breakdown'+(selectedDate!=="all"?" — "+fmtD(selectedDate):"")+'</div>';
       filtBStats.forEach(function(x){
         const col=BC[x.b]||"#888";
@@ -2670,14 +2672,31 @@ function renderReports(){
         html+='</div></div>';
       });
       if(filtUnknown>0){
-        html+='<div class="card" style="border-left:4px solid #aaa">';
-        html+='<div style="display:flex;justify-content:space-between"><span style="font-weight:700;color:#888">Unknown breed</span>';
-        html+='<span style="font-weight:700;font-family:sans-serif;color:#888">'+filtUnknown+' hives</span></div>';
-        html+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif;margin-top:4px">Set breed by tapping on each hive</div>';
+        html+='<div class="card" style="border-left:4px solid #aaa;margin-bottom:10px">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+        html+='<div style="font-size:17px;font-weight:700;color:#888">Unknown breed</div>';
+        html+='<div style="font-size:20px;font-weight:800;font-family:sans-serif;color:#888">'+filtUnknown+' hive'+(filtUnknown!==1?"s":"")+'</div>';
         html+='</div>';
+        html+='<div style="background:#eee9db;border-radius:6px;height:8px;overflow:hidden;margin-bottom:6px">';
+        html+='<div style="background:#aaa;height:100%;width:'+Math.round((filtUnknown/filtTotal)*100)+'%;border-radius:6px"></div>';
+        html+='</div>';
+        html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:10px">'+Math.round((filtUnknown/filtTotal)*100)+'% of hives — tap a hive to set breed</div>';
+        html+='<div style="border-top:1px solid #c8bc98;padding-top:8px">';
+        unknownHvs.forEach(function(h){
+          const ap=getAp(h.ap);
+          const installEv=getInstallEv(h);
+          html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="openHive(\''+h.id+'\')">';
+          html+='<div>';
+          html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"")+' · '+hvNameFull(h)+'</div>';
+          if(installEv)html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif">Installed '+fmtD(installEv.date)+'</div>';
+          html+='</div>';
+          html+='<span style="font-size:13px;color:#3a7d44;font-weight:700">Set breed →</span>';
+          html+='</div>';
+        });
+        html+='</div></div>';
       }
     } else {
-      html+='<div class="card" style="text-align:center;font-family:sans-serif;color:#4a6040">No breeds recorded for this date.</div>';
+      html+='<div class="card" style="text-align:center;font-family:sans-serif;color:#4a6040">No hives recorded.</div>';
     }
 
     // Waiting for bees
