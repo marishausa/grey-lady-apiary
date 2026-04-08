@@ -3545,6 +3545,16 @@ async function saveLog(){
     ev.id=uid();
   }
 
+  // ── CLOSE MODAL IMMEDIATELY after save ────────────────────────────────────
+  logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";
+  closeModal("log-modal");
+  toast$(hvIdsToSave.length>1?"Logged for "+hvIdsToSave.length+" hives ✓":"Logged ✓");
+  if(currentScreen==="home")renderHome();
+  else if(currentScreen==="apiary")renderApiary();
+  else if(currentScreen==="hive")renderHive();
+  else if(currentScreen==="workplan")renderWorkplan();
+
+  // ── DOWNSTREAM UPDATES (breed, queen, tasks) ──────────────────────────────
   // If install, update the hive breed automatically
   if(logType==="install" && ev.breed) {
     const hivesToUpdate=hvIdsToSave.length>0?hvIdsToSave:DB.hv.filter(function(h){return h.ap===apId;}).map(function(h){return h.id;});
@@ -3595,20 +3605,8 @@ async function saveLog(){
   if(matchingTasks.length>0){
     await Promise.all(matchingTasks.map(function(t){return SB.doneTask(t.id);}));
     DB.tk=DB.tk.filter(function(t){return !matchingTasks.find(function(m){return m.id===t.id;});});
-    const autoMsg=matchingTasks.length===1?"✓ Logged + 1 task auto-completed":"✓ Logged + "+matchingTasks.length+" tasks auto-completed";
-    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";
-    closeModal("log-modal");
-    toast$(autoMsg);
-  } else {
-    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";
-    closeModal("log-modal");
-    const saved2=hvIdsToSave.length;
-    toast$(saved2>1?"Logged for "+saved2+" hives ✓":"Logged ✓");
+    toast$("✓ "+matchingTasks.length+" task"+(matchingTasks.length>1?"s":"")+" auto-completed");
   }
-  if(currentScreen==="home")renderHome();
-  else if(currentScreen==="apiary")renderApiary();
-  else if(currentScreen==="hive")renderHive();
-  else if(currentScreen==="workplan")renderWorkplan();
   }catch(saveErr){
     console.error("saveLog error:",saveErr);
     toast$("Save error: "+saveErr.message,true);
