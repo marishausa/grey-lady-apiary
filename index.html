@@ -1884,37 +1884,61 @@ function renderWorkplan(){
   const tod=today();
   const sortMode=window._wpSort||"location";
 
+  // Overdue swarm trap checks
+  const overdueTrap=DB.tr.filter(function(t){
+    if(t.status!=="active")return false;
+    const last=t.last_checked||t.date_set;
+    if(!last)return false;
+    const days=Math.floor((Date.now()-new Date(last+"T12:00:00"))/86400000);
+    return days>=(t.check_interval||7);
+  });
+
   // Split into priority buckets
   const overdue=ot.filter(function(t){return t.due&&t.due<tod;});
   const dueToday=ot.filter(function(t){return t.due===tod;});
   const upcoming=ot.filter(function(t){return !t.due||t.due>tod;});
 
-  // Unique stop counts
   const todayAps=new Set(dueToday.concat(overdue).map(function(t){return t.ap;}).filter(Boolean));
   const totalDue=overdue.length+dueToday.length;
-
-  // Route button for overdue/today stops
-  const urgentAps=DB.ap.filter(function(a){
-    return todayAps.has(a.id);
-  }).sort(function(a,b){return(a.lng||0)-(b.lng||0)});
+  const urgentAps=DB.ap.filter(function(a){return todayAps.has(a.id);}).sort(function(a,b){return(a.lng||0)-(b.lng||0)});
 
   let html="";
 
   // ── DAILY SUMMARY HEADER ──────────────────────────────────────────────────
   html+='<div style="background:#2d4a2d;border-radius:16px;padding:16px;margin-bottom:12px;color:#f0ede0">';
   html+='<div style="font-size:13px;color:#9dc89d;font-family:sans-serif;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Today\'s Plan</div>';
-  if(totalDue===0){
+  if(totalDue===0&&overdueTrap.length===0){
     html+='<div style="font-size:22px;font-weight:800">🎉 All caught up!</div>';
     html+='<div style="font-size:14px;color:#9dc89d;font-family:sans-serif;margin-top:4px">'+upcoming.length+' tasks upcoming</div>';
   } else {
     html+='<div style="font-size:26px;font-weight:800">'+todayAps.size+' stop'+(todayAps.size!==1?'s':'')+' · '+totalDue+' task'+(totalDue!==1?'s':'')+' due</div>';
     if(overdue.length>0)html+='<div style="font-size:14px;color:#f08080;font-family:sans-serif;margin-top:4px">⚠️ '+overdue.length+' overdue</div>';
   }
+  if(overdueTrap.length>0){
+    html+='<div style="margin-top:8px;padding:8px 12px;background:rgba(184,120,32,.3);border-radius:10px;font-size:14px;font-weight:700;color:#ffd080">🪤 '+overdueTrap.length+' swarm trap'+(overdueTrap.length!==1?'s':'')+' need checking</div>';
+  }
   if(urgentAps.length>0){
     const url="https://www.google.com/maps/dir/"+urgentAps.slice(0,9).map(function(a){return encodeURIComponent(a.addr+", Nantucket, MA");}).join("/");
     html+='<a href="'+url+'" target="_blank" style="display:inline-block;margin-top:10px;padding:9px 18px;background:#3a7d44;border-radius:10px;color:#fff;font-size:14px;font-weight:700;text-decoration:none">🗺 Route Today\'s Stops</a>';
   }
   html+='</div>';
+
+  // ── TRAP CHECKS (if any overdue) ──────────────────────────────────────────
+  if(overdueTrap.length>0){
+    html+='<div class="sec">🪤 Swarm Traps — Check Now</div>';
+    overdueTrap.forEach(function(t){
+      const last=t.last_checked||t.date_set;
+      const days=last?Math.floor((Date.now()-new Date(last+"T12:00:00"))/86400000):null;
+      html+='<div class="tcard" style="border-left:4px solid #b87820;display:flex;align-items:center;justify-content:space-between">';
+      html+='<div>';
+      html+='<div style="font-size:16px;font-weight:700">🪤 '+(t.label||t.location||"Trap")+'</div>';
+      if(t.nearest_addr)html+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif">📍 '+t.nearest_addr+'</div>';
+      if(days!==null)html+='<div style="font-size:13px;color:#b83030;font-family:sans-serif;font-weight:700">'+days+'d since last check</div>';
+      html+='</div>';
+      html+='<button onclick="checkTrap(\''+t.id+'\')" style="padding:10px 16px;background:#b87820;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif;white-space:nowrap">✓ Checked</button>';
+      html+='</div>';
+    });
+  }
 
   // ── SORT CONTROLS ─────────────────────────────────────────────────────────
   html+='<div style="display:flex;gap:6px;margin-bottom:14px">';
@@ -2177,6 +2201,29 @@ function initMap(){
       pts.push([a.lat,a.lng]);
     });
     if(pts.length>1)map.fitBounds(pts,{padding:[40,40],maxZoom:13});
+
+    // Add deployed swarm trap markers
+    DB.tr.filter(function(t){return t.status==="active"&&t.lat&&t.lng;}).forEach(function(t){
+      const last=t.last_checked||t.date_set;
+      const daysSince=last?Math.floor((Date.now()-new Date(last+"T12:00:00"))/86400000):null;
+      const overdue=daysSince!==null&&daysSince>=(t.check_interval||7);
+      const col=overdue?"#b83030":"#b87820";
+      const trapIcon=L.divIcon({className:"",iconSize:[32,32],iconAnchor:[16,16],
+        html:'<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center"><div style="width:22px;height:22px;background:'+col+';border:3px solid #fff;transform:rotate(45deg);box-shadow:0 2px 6px rgba(0,0,0,.5)"></div></div>'
+      });
+      const tm=L.marker([t.lat,t.lng],{icon:trapIcon}).addTo(map);
+      let popup='<div style="font-family:sans-serif;min-width:160px">';
+      popup+='<div style="font-size:15px;font-weight:800;color:#b87820">🪤 '+(t.label||t.location||"Trap")+'</div>';
+      if(t.label&&t.location)popup+='<div style="font-size:13px;color:#4a6040">'+t.location+'</div>';
+      if(t.nearest_addr)popup+='<div style="font-size:12px;color:#8a9e80">📍 '+t.nearest_addr+'</div>';
+      popup+='<div style="font-size:13px;margin-top:6px;color:'+(overdue?"#b83030":"#3a7d44")+'">';
+      popup+=overdue?"⚠️ Overdue for check":daysSince!==null?"✓ Checked "+daysSince+"d ago":"Not yet checked";
+      popup+='</div>';
+      if(t.lure&&t.lure!=="none")popup+='<div style="font-size:12px;color:#8a9e80;margin-top:2px">🍋 '+t.lure+'</div>';
+      popup+='</div>';
+      tm.bindPopup(popup,{maxWidth:200});
+      pts.push([t.lat,t.lng]);
+    });
   }
   if(window.L){buildMap(window.L);}
   else{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";s.onload=function(){buildMap(window.L);};document.head.appendChild(s);}
