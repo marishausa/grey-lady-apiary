@@ -2703,10 +2703,13 @@ function renderReports(){
         html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif;margin-bottom:8px">Tap any hive to record breed</div>';
         html+='<div style="border-top:1px solid #c8bc98;padding-top:8px">';
         unrecordedHvs.forEach(function(h){
-          const ap=getAp(h.ap);
+          const ap=DB.ap.find(function(a){return a.id===h.ap;});
           html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #eee9db;cursor:pointer" onclick="openHive(\''+h.id+'\')">';
-          html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"")+' · '+hvNameFull(h)+'</div>';
-          html+='<span style="font-size:13px;color:#3a7d44;font-weight:700">Set breed →</span>';
+          html+='<div>';
+          html+='<div style="font-size:14px;font-weight:600;color:#1a2e1a">'+(ap?ap.addr:"No address")+' · '+hvNameFull(h)+'</div>';
+          if(ap&&ap.contact)html+='<div style="font-size:12px;color:#8a9e80;font-family:sans-serif">'+ap.contact+'</div>';
+          html+='</div>';
+          html+='<span style="font-size:13px;color:#3a7d44;font-weight:700">Set →</span>';
           html+='</div>';
         });
         html+='</div></div>';
