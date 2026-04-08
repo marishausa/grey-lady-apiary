@@ -3445,8 +3445,15 @@ function getSelectedHiveIds(){
   return cbs.filter(function(c){return c.checked;}).map(function(c){return c.value;});
 }
 async function saveLog(){
+  // Guard against double-tap
+  if(window._saving){return;}
+  window._saving=true;
+  const saveBtn=document.querySelector('#log-modal .btn-big');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent="Saving…";}
+
+  try{
   const apId=document.getElementById("log-ap").value;
-  if(!apId){toast$("Select a host",true);return;}
+  if(!apId){toast$("Select a host",true);window._saving=false;if(saveBtn){saveBtn.disabled=false;saveBtn.textContent="✓ Save";}return;}
   const selectedHvIds=getSelectedHiveIds();
   // If no checkboxes exist or none selected, treat as "all hives" (null hive_id)
   // Don't block — just proceed with apiary-level event
@@ -3540,89 +3547,76 @@ async function saveLog(){
 
   // If install, update the hive breed automatically
   if(logType==="install" && ev.breed) {
-    if(hvId) {
-      // Specific hive selected — update just that one
-      await SB.updateHive(hvId, {breed: ev.breed, hive_status: "active"});
-      DB.hv = DB.hv.map(function(h) {
-        if(h.id !== hvId) return h;
-        return Object.assign({}, h, {breed: ev.breed, status: "active"});
-      });
-      toast$("Hive breed set to "+ev.breed+" ✓");
-    } else {
-      // No specific hive — update ALL hives at this apiary
-      const apHives = DB.hv.filter(function(h){return h.ap===apId;});
-      for(let i=0;i<apHives.length;i++){
-        await SB.updateHive(apHives[i].id, {breed: ev.breed, hive_status: "active"});
-      }
-      DB.hv = DB.hv.map(function(h) {
-        if(h.ap !== apId) return h;
-        return Object.assign({}, h, {breed: ev.breed, status: "active"});
-      });
-      toast$("All "+apHives.length+" hives set to "+ev.breed+" ✓");
+    const hivesToUpdate=hvIdsToSave.length>0?hvIdsToSave:DB.hv.filter(function(h){return h.ap===apId;}).map(function(h){return h.id;});
+    for(var bi=0;bi<hivesToUpdate.length;bi++){
+      await SB.updateHive(hivesToUpdate[bi], {breed: ev.breed, hive_status: "active"});
     }
+    DB.hv=DB.hv.map(function(h){
+      if(hivesToUpdate.indexOf(h.id)===-1)return h;
+      return Object.assign({},h,{breed:ev.breed,status:"active"});
+    });
+    toast$(hivesToUpdate.length===1?"Hive breed set to "+ev.breed+" ✓":""+hivesToUpdate.length+" hives set to "+ev.breed+" ✓");
   }
 
-  // Update hive queen/strength if inspection
-  if(logType==="inspection" && hvId){
+  // Update hive queen/strength if inspection for specific hives
+  if(logType==="inspection" && hvIdsToSave.length>0){
     const fields={};
     if(logQ===true)fields.queen="Seen";
     else if(logQ===false)fields.queen="Not Seen";
     if(logStr)fields.str=logStr;
     if(Object.keys(fields).length>0){
-      await SB.updateHive(hvId,fields);
-      DB.hv=DB.hv.map(function(h){if(h.id!==hvId)return h;return Object.assign({},h,fields);});
+      for(var qi=0;qi<hvIdsToSave.length;qi++){
+        await SB.updateHive(hvIdsToSave[qi],fields);
+      }
+      DB.hv=DB.hv.map(function(h){if(hvIdsToSave.indexOf(h.id)===-1)return h;return Object.assign({},h,fields);});
     }
   }
 
   // Create follow-up task
   if(followup){
-    const tk={id:uid(),ap:apId,hv:hvId||null,ttype:"inspection",notes:"Follow-up",due:followup};
+    const fhv=hvIdsToSave.length===1?hvIdsToSave[0]:null;
+    const tk={id:uid(),ap:apId,hv:fhv,ttype:"inspection",notes:"Follow-up",due:followup};
     await SB.addTask(tk);
     tk.status="open";tk.ts=new Date().toISOString();
     DB.tk.push(tk);
   }
 
-  // ── AUTO-COMPLETE matching open tasks ─────────────────────────────────────
-  // Define which log types complete which task types
-  const autoCompleteMap={
-    feeding:    ["feeding","feed"],
-    inspection: ["inspection","queen","queen-check","check","follow-up","recheck"],
-    treatment:  ["treatment","treat","mite"],
-    harvest:    ["harvest"],
-    install:    ["install"],
-  };
+  // Auto-complete matching open tasks
+  const autoCompleteMap={feeding:["feeding","feed"],inspection:["inspection","queen","queen-check","check","follow-up","recheck"],treatment:["treatment","treat","mite"],harvest:["harvest"],install:["install"]};
   const matchTypes=autoCompleteMap[logType]||[];
-  // Find open tasks for this apiary (and hive if specific)
   const matchingTasks=DB.tk.filter(function(t){
     if(t.status!=="open")return false;
     if(t.ap!==apId)return false;
-    // If hive specific, match hive or apiary-level tasks
-    if(hvId&&t.hv&&t.hv!==hvId)return false;
+    if(hvIdsToSave.length>0&&t.hv&&hvIdsToSave.indexOf(t.hv)===-1)return false;
     const ttype=(t.ttype||"").toLowerCase();
     const tnotes=(t.notes||"").toLowerCase();
     return matchTypes.some(function(m){return ttype.includes(m)||tnotes.includes(m);});
   });
   if(matchingTasks.length>0){
-    // Complete all matching tasks in parallel
     await Promise.all(matchingTasks.map(function(t){return SB.doneTask(t.id);}));
-    DB.tk=DB.tk.filter(function(t){
-      return !matchingTasks.find(function(m){return m.id===t.id;});
-    });
-    const autoMsg=matchingTasks.length===1
-      ?"✓ Logged + 1 task auto-completed"
-      :"✓ Logged + "+matchingTasks.length+" tasks auto-completed";
-    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";logFrames=0;
+    DB.tk=DB.tk.filter(function(t){return !matchingTasks.find(function(m){return m.id===t.id;});});
+    const autoMsg=matchingTasks.length===1?"✓ Logged + 1 task auto-completed":"✓ Logged + "+matchingTasks.length+" tasks auto-completed";
+    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";
     closeModal("log-modal");
     toast$(autoMsg);
   } else {
-    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";logFrames=0;
+    logQ=null;logEggs=null;logQCells=null;logCappedBrood=null;logStr="";logBrd="";
     closeModal("log-modal");
-    toast$("Logged ✓");
+    const saved2=hvIdsToSave.length;
+    toast$(saved2>1?"Logged for "+saved2+" hives ✓":"Logged ✓");
   }
   if(currentScreen==="home")renderHome();
   else if(currentScreen==="apiary")renderApiary();
   else if(currentScreen==="hive")renderHive();
   else if(currentScreen==="workplan")renderWorkplan();
+  }catch(saveErr){
+    console.error("saveLog error:",saveErr);
+    toast$("Save error: "+saveErr.message,true);
+  }finally{
+    window._saving=false;
+    const sb=document.querySelector('#log-modal .btn-big');
+    if(sb){sb.disabled=false;sb.textContent="✓ Save";}
+  }
 }
 
 // ─── TASK MODAL ─────────────────────────────────────────────────────────────
