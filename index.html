@@ -309,6 +309,7 @@ a{text-decoration:none}
     </select>
     <label class="lbl">Destination</label>
     <select class="sel" id="caught-dest" onchange="updateCaughtDest()">
+      <option value="existing_hive">Install into existing hive</option>
       <option value="new_hive">Start new hive at existing host</option>
       <option value="weak_colony">Add to weak colony (combine)</option>
       <option value="nuc">Place in nuc box</option>
@@ -320,7 +321,7 @@ a{text-decoration:none}
       <select class="sel" id="caught-host" onchange="updateCaughtHiveList()"></select>
     </div>
     <div id="caught-hive-row" style="display:none">
-      <label class="lbl">Weak Hive to Combine With</label>
+      <label class="lbl" id="caught-hive-label">Select Hive</label>
       <select class="sel" id="caught-hive"></select>
     </div>
     <label class="lbl">Notes</label>
@@ -483,6 +484,32 @@ a{text-decoration:none}
         </select>
         <label class="lbl">Swarm Destination</label>
         <input class="inp" id="log-swarm-dest" placeholder="e.g. Caught in trap, flew to neighbor's tree…">
+      </div>
+      <div id="log-combine-fields" style="display:none">
+        <label class="lbl">Hives Being Merged (source)</label>
+        <input class="inp" id="log-combine-sources" placeholder="e.g. Hive 2, Hive 5 — list hives being absorbed">
+        <label class="lbl">Resulting Hive (survives)</label>
+        <input class="inp" id="log-combine-result" placeholder="e.g. Hive 3 — hive that receives the bees">
+        <label class="lbl">Method</label>
+        <select class="sel" id="log-combine-method">
+          <option value="newspaper">Newspaper method</option>
+          <option value="direct">Direct combine</option>
+          <option value="swarm">Swarm added to hive</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div id="log-split-fields" style="display:none">
+        <label class="lbl">Frames Taken</label>
+        <input type="number" class="inp" id="log-split-frames" placeholder="e.g. 3" min="1" max="20">
+        <label class="lbl">What was moved</label>
+        <select class="sel" id="log-split-content">
+          <option value="brood_bees">Brood + bees</option>
+          <option value="brood_bees_queen">Brood + bees + queen</option>
+          <option value="brood_bees_cells">Brood + bees + queen cells</option>
+          <option value="bees_only">Bees only</option>
+        </select>
+        <label class="lbl">Destination</label>
+        <input class="inp" id="log-split-dest" placeholder="e.g. New Hive 6, or Hive 4 (boost weak colony)">
       </div>
       <label class="lbl">Notes</label>
       <textarea class="textarea" id="log-notes" placeholder="Observations…"></textarea>
@@ -805,8 +832,11 @@ const ET={
   treatment:{icon:"💊",label:"Treatment",color:"#1a6b8a"},
   harvest:{icon:"🫙",label:"Harvest",color:"#7b5ea7"},
   install:{icon:"📦",label:"Install",color:"#b06020"},
+  split:{icon:"✂️",label:"Split",color:"#2060a0"},
+  combine:{icon:"🤝",label:"Combine",color:"#5a7a5a"},
+  boost:{icon:"💪",label:"Boost Weak Colony",color:"#b87820"},
   swarm:{icon:"🐝",label:"Swarm",color:"#c0392b"},
-  equipment:{icon:"🔧",label:"Equipment",color:"#2060a0"},
+  equipment:{icon:"🔧",label:"Equipment",color:"#606060"},
   note:{icon:"📝",label:"Note",color:"#888888"}
 };
 
@@ -1426,26 +1456,31 @@ function renderHive(){
   const li=lastEv(h.id,"inspection");
   const lf=lastEv(h.id,"feeding");
   const lt=lastEv(h.id,"treatment");
-  const installEv=evts.filter(function(e){return e.type==="install";}).sort(function(a,b){return (a.date||"").localeCompare(b.date||"");})[0];
+  const installEvts=evts.filter(function(e){return e.type==="install";}).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
+  const installEv=installEvts[0]; // most recent
 
   let body="";
 
   // ── INSTALL SUMMARY ──────────────────────────────────────────────────────
   if(installEv){
     body+='<div class="card" style="margin-bottom:14px;border-left:4px solid #b06020;background:#fdf6ee">';
-    body+='<div style="font-size:15px;font-weight:800;color:#b06020;margin-bottom:8px">📦 Installation Record</div>';
-    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-family:sans-serif">';
-    body+='<div><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Date</div><div style="font-size:15px;font-weight:700;color:#1a2e1a">'+fmtD(installEv.date)+'</div></div>';
-    if(installEv.breed||h.breed){
-      body+='<div><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Breed</div><div style="font-size:15px;font-weight:700;color:'+(BC[installEv.breed||h.breed]||"#1a2e1a")+'">'+(installEv.breed||h.breed)+'</div></div>';
-    }
-    if(installEv.source){
-      body+='<div style="grid-column:1/-1"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Source</div><div style="font-size:15px;font-weight:700;color:#1a2e1a">'+escHtml(installEv.source)+'</div></div>';
-    }
-    if(installEv.notes){
-      body+='<div style="grid-column:1/-1"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Notes</div><div style="font-size:14px;color:#4a6040">'+escHtml(installEv.notes)+'</div></div>';
-    }
-    body+='</div></div>';
+    body+='<div style="font-size:15px;font-weight:800;color:#b06020;margin-bottom:8px">📦 Installation'+(installEvts.length>1?" ("+installEvts.length+" total)":"")+'</div>';
+    installEvts.forEach(function(ev,idx){
+      if(idx>0)body+='<div style="border-top:1px solid #e8d8c0;margin-top:8px;padding-top:8px"></div>';
+      body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-family:sans-serif">';
+      body+='<div><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Date</div><div style="font-size:15px;font-weight:700;color:#1a2e1a">'+fmtD(ev.date)+'</div></div>';
+      if(ev.breed||h.breed){
+        body+='<div><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Breed</div><div style="font-size:15px;font-weight:700;color:'+(BC[ev.breed||h.breed]||"#1a2e1a")+'">'+(ev.breed||h.breed)+'</div></div>';
+      }
+      if(ev.source){
+        body+='<div style="grid-column:1/-1"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Source</div><div style="font-size:15px;font-weight:700;color:#1a2e1a">'+escHtml(ev.source)+'</div></div>';
+      }
+      if(ev.notes){
+        body+='<div style="grid-column:1/-1"><div style="font-size:11px;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em">Notes</div><div style="font-size:14px;color:#4a6040">'+escHtml(ev.notes)+'</div></div>';
+      }
+      body+='</div>';
+    });
+    body+='</div>';
   } else {
     body+='<div class="card" style="margin-bottom:14px;border:1.5px dashed #c8bc98;text-align:center;padding:16px">';
     body+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif">No install record yet</div>';
@@ -3346,7 +3381,7 @@ function setLogType(t){
   updateLogFields();
 }
 function updateLogFields(){
-  const fields=["insp","feed","treat","harvest","install","equip"];
+  const fields=["insp","feed","treat","harvest","install","equip","combine","split"];
   fields.forEach(function(f){
     const el=document.getElementById("log-"+f+"-fields");
     if(el)el.style.display="none";
@@ -3364,6 +3399,8 @@ function updateLogFields(){
   else if(logType==="install"){document.getElementById("log-install-fields").style.display="block";}
   else if(logType==="swarm"){document.getElementById("log-swarm-fields").style.display="block";}
   else if(logType==="equipment"){document.getElementById("log-equip-fields").style.display="block";}
+  else if(logType==="combine"){document.getElementById("log-combine-fields").style.display="block";}
+  else if(logType==="split"){document.getElementById("log-split-fields").style.display="block";}
 }
 let logQ=null,logEggs=null,logQCells=null,logCappedBrood=null,logStr="",logBrd="";
 function renderInspFields(){
@@ -3604,6 +3641,20 @@ async function saveLog(){
     const equipNames={queen_excluder:"Queen excluder",pollen_trap:"Pollen trap",propolis_trap:"Propolis trap",winter_blanket:"Winter blanket"};
     const actionWord=ev.equip_action==="installed"?"Installed":"Removed";
     if(!ev.notes)ev.notes=actionWord+" "+(equipNames[ev.equip_type]||ev.equip_type);
+  }
+  else if(logType==="combine"){
+    const sources=document.getElementById("log-combine-sources").value.trim();
+    const result=document.getElementById("log-combine-result").value.trim();
+    const method=document.getElementById("log-combine-method").value;
+    const methodLabels={newspaper:"newspaper method",direct:"direct combine",swarm:"swarm added to hive",other:""};
+    if(!ev.notes)ev.notes="Combined: "+[sources,result?"→ "+result:"",methodLabels[method]].filter(Boolean).join(" · ");
+  }
+  else if(logType==="split"){
+    const frames=document.getElementById("log-split-frames").value;
+    const content=document.getElementById("log-split-content").value;
+    const dest=document.getElementById("log-split-dest").value.trim();
+    const contentLabels={"brood_bees":"brood + bees","brood_bees_queen":"brood + bees + queen","brood_bees_cells":"brood + bees + queen cells","bees_only":"bees only"};
+    if(!ev.notes)ev.notes="Split: "+(frames?frames+" frames of ":"")+contentLabels[content]+(dest?" → "+dest:"");
   }
 
   // Determine which hives to save for
@@ -4368,12 +4419,19 @@ function updateCaughtDest(){
   const dest=document.getElementById("caught-dest").value;
   const hostRow=document.getElementById("caught-host-row");
   const hiveRow=document.getElementById("caught-hive-row");
+  const hiveLabel=document.getElementById("caught-hive-label");
   if(dest==="sell"||dest==="undecided"){
     hostRow.style.display="none";
     hiveRow.style.display="none";
+  } else if(dest==="existing_hive"){
+    hostRow.style.display="block";
+    hiveRow.style.display="block";
+    if(hiveLabel)hiveLabel.textContent="Install Into Hive";
+    updateCaughtHiveList();
   } else if(dest==="weak_colony"){
     hostRow.style.display="block";
     hiveRow.style.display="block";
+    if(hiveLabel)hiveLabel.textContent="Weak Hive to Combine With";
     updateCaughtHiveList();
   } else {
     hostRow.style.display="block";
@@ -4382,11 +4440,19 @@ function updateCaughtDest(){
 }
 
 function updateCaughtHiveList(){
+  const dest=document.getElementById("caught-dest").value;
   const apId=document.getElementById("caught-host").value;
-  const weakHives=DB.hv.filter(function(h){return h.ap===apId&&(h.str==="Weak"||h.str==="Very Weak");});
-  const allHives=DB.hv.filter(function(h){return h.ap===apId;});
-  const hvs=weakHives.length>0?weakHives:allHives;
-  document.getElementById("caught-hive").innerHTML='<option value="">— Select hive —</option>'+hvs.map(function(h){return'<option value="'+h.id+'">Hive '+h.n+(h.str?" ("+h.str+")":"")+'</option>';}).join("");
+  var hvs;
+  if(dest==="existing_hive"){
+    // Show all hives at this location
+    hvs=DB.hv.filter(function(h){return h.ap===apId;});
+  } else {
+    // Weak colony — show weak hives first
+    const weakHives=DB.hv.filter(function(h){return h.ap===apId&&(h.str==="Weak"||h.str==="Very Weak");});
+    const allHives=DB.hv.filter(function(h){return h.ap===apId;});
+    hvs=weakHives.length>0?weakHives:allHives;
+  }
+  document.getElementById("caught-hive").innerHTML='<option value="">— Select hive —</option>'+hvs.map(function(h){return'<option value="'+h.id+'">'+hvNameFull(h)+(h.str?" ("+h.str+")":"")+'</option>';}).join("");
 }
 
 async function saveSwarmCaught(){
@@ -4397,8 +4463,8 @@ async function saveSwarmCaught(){
   const notes=document.getElementById("caught-notes").value;
   const trap=DB.tr.find(function(t){return t.id===caughtTrapId;});
 
-  // Update trap status
   const destText={
+    existing_hive:"Installed into existing hive at "+(getAp(apId)?getAp(apId).addr:"host"),
     new_hive:"New hive at "+(getAp(apId)?getAp(apId).addr:"host"),
     weak_colony:"Combined with weak colony",
     nuc:"Placed in nuc",
@@ -4417,35 +4483,48 @@ async function saveSwarmCaught(){
     return Object.assign({},t,{status:"caught",last_checked:today(),swarm_size:size,destination:destText});
   });
 
-  // Log swarm event
+  // Log swarm event on trap
   const swarmEv={
     id:uid(), ap:apId||null, hv:hvId||null,
     date:today(), type:"swarm",
     swarm_type:"caught", swarm_dest:destText,
-    notes:"From trap: "+(trap?trap.location:"")+(notes?" — "+notes:"")
+    notes:"From trap: "+(trap?trap.label||trap.location:"")+(notes?" — "+notes:"")
   };
   await SB.addEvent(swarmEv);
   swarmEv.ts=new Date().toISOString();
   DB.ev.unshift(swarmEv);
 
-  // If new hive — create a new hive record at that apiary
-  if(dest==="new_hive"&&apId){
+  // Install into existing hive — log an install event on that hive
+  if(dest==="existing_hive"&&hvId){
+    const installEv={
+      id:uid(), ap:apId, hv:hvId,
+      date:today(), type:"install",
+      notes:"From swarm trap"+(trap?" — "+(trap.label||trap.location):"")+(notes?" — "+notes:"")
+    };
+    await SB.addEvent(installEv);
+    installEv.ts=new Date().toISOString();
+    DB.ev.unshift(installEv);
+    // Set hive status to active
+    await SB.updateHive(hvId,{hive_status:"active"});
+    DB.hv=DB.hv.map(function(h){return h.id!==hvId?h:Object.assign({},h,{status:"active"});});
+    const h=DB.hv.find(function(h){return h.id===hvId;});
+    const dt=new Date();dt.setDate(dt.getDate()+21);
+    await SB.addTask({id:uid(),ap:apId,hv:hvId,ttype:"inspection",notes:"Recheck — queen laying after swarm install?",due:dt.toISOString().split("T")[0]});
+    toast$("✓ Swarm installed into "+hvNameFull(h)+" — 21-day recheck task created");
+  } else if(dest==="new_hive"&&apId){
     const ap=getAp(apId);
     const existingHives=DB.hv.filter(function(h){return h.ap===apId;});
     const nextNum=existingHives.length+1;
     const newHiveId=apId+"-h"+nextNum+"-sw";
-    const newHive={id:newHiveId,apiary_id:apId,num:nextNum,queen:"Unknown",strength:"Medium",risk:null,notes:"Started from swarm caught "+today(),breed:null};
+    const newHive={id:newHiveId,apiary_id:apId,num:nextNum,queen:"Unknown",strength:"Medium",risk:null,notes:"Started from swarm caught "+today(),breed:null,created_at:today()};
     await supa.from('hives').insert(newHive);
-    DB.hv.push({id:newHiveId,ap:apId,n:nextNum,queen:"Unknown",str:"Medium",risk:null,notes:"Started from swarm caught "+today(),breed:null});
-    // Update apiary hive count
+    DB.hv.push({id:newHiveId,ap:apId,n:nextNum,label:null,queen:"Unknown",str:"Medium",risk:null,notes:"Started from swarm caught "+today(),breed:null,status:"active",created_at:today()});
     if(ap){
-      await SB.updateApiaryCoords(apId,ap.lat,ap.lng); // keep coords
       await supa.from('apiaries').update({hives:nextNum}).eq('id',apId);
       DB.ap=DB.ap.map(function(a){if(a.id!==apId)return a;return Object.assign({},a,{hives:nextNum});});
     }
-    toast$("Swarm logged ✓ — new Hive "+nextNum+" created at "+( ap?ap.addr:"host"));
+    toast$("Swarm logged ✓ — new Hive "+nextNum+" created at "+(ap?ap.addr:"host"));
   } else if(dest==="weak_colony"&&hvId){
-    // Mark weak hive as needing recheck
     const dt=new Date();dt.setDate(dt.getDate()+21);
     await SB.addTask({id:uid(),ap:apId,hv:hvId,ttype:"inspection",notes:"Recheck after swarm combine — queen laying?",due:dt.toISOString().split("T")[0]});
     toast$("Swarm logged ✓ — 21-day recheck task created");
