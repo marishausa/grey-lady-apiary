@@ -1451,7 +1451,11 @@ function renderHive(){
   hero+='</div>';
   document.getElementById("hive-hero").innerHTML=hero;
 
-  const evts=hvEv(h.id).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
+  const evts=hvEv(h.id).filter(function(e){return e.date;}).sort(function(a,b){
+    var dd=(b.date||"").localeCompare(a.date||"");
+    if(dd!==0)return dd;
+    return (b.ts||"").localeCompare(a.ts||"");
+  });
   const tasks=hvTk(h.id);
   const li=lastEv(h.id,"inspection");
   const lf=lastEv(h.id,"feeding");
@@ -1740,8 +1744,11 @@ function renderHive(){
     evts.forEach(function(ev){
       const mo=ev.date?ev.date.slice(0,7):"";
       if(mo!==lastMonth){
-        const d=new Date(mo+"-01");
-        body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;font-family:sans-serif;text-transform:uppercase;letter-spacing:.07em;margin:12px 0 6px;padding-left:4px">'+d.toLocaleDateString("en-US",{month:"long",year:"numeric"})+'</div>';
+        const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+        const parts=mo.split("-");
+        const monthName=months[parseInt(parts[1],10)-1]||mo;
+        const yearStr=parts[0];
+        body+='<div style="font-size:12px;font-weight:700;color:#8a9e80;font-family:sans-serif;text-transform:uppercase;letter-spacing:.07em;margin:12px 0 6px;padding-left:4px">'+monthName+" "+yearStr+'</div>';
         lastMonth=mo;
       }
       body+=eventRowHTML(ev,false);
