@@ -846,7 +846,11 @@ let DB = {ap:[], hv:[], ev:[], tk:[], tr:[]};
 // Map Supabase column names → app field names
 function mapAp(row){return{id:row.id,addr:row.addr,contact:row.contact,hives:row.hives,lat:row.lat,lng:row.lng,phone:row.phone||'',notes:row.notes||''};}
 function mapHv(row){return{id:row.id,ap:row.apiary_id,n:row.num,label:row.label||null,breed:row.breed,queen:row.queen||'Unknown',str:row.strength||'Medium',risk:row.risk,notes:row.notes||'',status:row.hive_status||'active',winter_survived:row.winter_survived===null||row.winter_survived===undefined?null:row.winter_survived,winter_year:row.winter_year||null,box_count:row.box_count||null,box_types:row.box_types||null,bottom_board:row.bottom_board||null,feeder:row.feeder||null,created_at:row.created_at||null};}
-function mapEv(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:row.date,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,capped_brood:row.capped_brood,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,equip_type:row.equip_type,equip_action:row.equip_action};}
+function mapEv(row){
+  // Normalize date — Supabase may return full timestamp, extract just YYYY-MM-DD
+  var d=row.date?String(row.date).slice(0,10):null;
+  return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:d,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,capped_brood:row.capped_brood,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,equip_type:row.equip_type,equip_action:row.equip_action};
+}
 
 function mapTk(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,ttype:row.task_type,notes:row.notes,due:row.due_date,status:row.status,ts:row.created_at};}
 
@@ -2918,10 +2922,23 @@ function renderReports(){
       return h.status==="dead"&&h.winter_year!==yr&&!deadOuts.find(function(d){return d.id===h.id;});
     });
     const allDeadOuts=deadOuts.concat(deadNoRecord);
+    // Not recorded = active hives that existed BEFORE this season (not new installs)
+    // A hive is "new this season" if its first install event is after Jan 1 of current year
+    // OR if created_at is after Jan 1 of current year
+    const seasonStart=yr+"-01-01";
     const notRecorded=DB.hv.filter(function(h){
-      return h.winter_survived!==true&&h.winter_survived!=="true"&&
-             h.winter_survived!==false&&h.winter_survived!=="false"&&
-             h.status!=="dead";
+      if(h.winter_survived===true||h.winter_survived==="true")return false;
+      if(h.winter_survived===false||h.winter_survived==="false")return false;
+      if(h.status==="dead")return false;
+      if(h.status==="waiting")return false; // never had bees
+      // Exclude if created this season
+      if(h.created_at&&h.created_at>=seasonStart)return false;
+      // Exclude if first install was this season
+      const firstInstall=DB.ev.filter(function(e){
+        return (e.hv===h.id||(e.ap===h.ap&&!e.hv))&&e.type==="install";
+      }).sort(function(a,b){return (a.date||"").localeCompare(b.date||"");})[0];
+      if(firstInstall&&firstInstall.date>=seasonStart)return false;
+      return true;
     });
     const total=survived.length+allDeadOuts.length;
     const rate=total>0?Math.round((survived.length/total)*100):null;
@@ -3256,13 +3273,18 @@ async function saveEditEvent(){
   if(!editingEventId)return;
   const date=document.getElementById("edit-ev-date").value;
   const notes=document.getElementById("edit-ev-notes").value;
-  const source=document.getElementById("edit-ev-source").value;
+  const sourceEl=document.getElementById("edit-ev-source");
+  const source=sourceEl?sourceEl.value:"";
   if(!date){toast$("Date is required",true);return;}
   const updates={date:date,notes:notes||null};
   const ev=DB.ev.find(function(e){return e.id===editingEventId;});
   if(ev&&ev.type==="install")updates.source=source||null;
   const {error}=await supa.from("events").update(updates).eq("id",editingEventId);
-  if(error){toast$("Save failed",true);console.error(error);return;}
+  if(error){
+    toast$("Save failed: "+error.message,true);
+    console.error("editEvent error:",error);
+    return;
+  }
   DB.ev=DB.ev.map(function(e){
     if(e.id!==editingEventId)return e;
     return Object.assign({},e,updates);
@@ -3882,6 +3904,23 @@ function copyHostMsg(){
 // ─── TASK ACTIONS ─────────────────────────────────────────────────────────
 async function doneTask(id){
   const tk=DB.tk.find(function(t){return t.id===id;});if(!tk)return;
+  // For inspection/feeding/treatment tasks, open the log modal to capture real data
+  const logTypes={inspection:"inspection",feeding:"feeding",treatment:"treatment",harvest:"harvest",install:"install"};
+  const mappedType=logTypes[tk.ttype];
+  if(mappedType&&tk.ap){
+    // Mark task done first
+    await SB.doneTask(id);
+    DB.tk=DB.tk.filter(function(t){return t.id!==id;});
+    toast$("Task done — log the details:");
+    // Open log modal pre-filled
+    openLogModal({ap:tk.ap,hv:tk.hv||"",etype:mappedType});
+    if(currentScreen==="home")renderHome();
+    else if(currentScreen==="apiary")renderApiary();
+    else if(currentScreen==="hive")renderHive();
+    else if(currentScreen==="workplan")renderWorkplan();
+    return;
+  }
+  // For other task types (note, equipment etc) just mark done with a note
   const noteId=uid();
   await Promise.all([
     SB.addEvent({id:noteId,ap:tk.ap,hv:tk.hv,date:today(),notes:"Done: "+(tk.notes||tk.ttype||"task"),type:"note"}),
