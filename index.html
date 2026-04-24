@@ -2033,16 +2033,17 @@ function renderWorkplan(){
   }
 
   // ── HIVE CONTEXT HELPER ───────────────────────────────────────────────────
-  function hiveContext(hv){
-    if(!hv)return"";
+  function hiveContext(hv, apId){
+    const lookupAp=hv?hv.ap:(apId||null);
+    if(!hv&&!lookupAp)return"";
     const yr=new Date().getFullYear();
     const installEv=DB.ev.filter(function(e){
       if(e.type!=="install")return false;
-      if(e.hv===hv.id)return true;
-      if(e.ap===hv.ap&&!e.hv)return true;
+      if(hv&&e.hv==hv.id)return true;
+      if(lookupAp&&e.ap==lookupAp&&!e.hv)return true;
       return false;
     }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");})[0];
-    const survived=hv.winter_survived===true&&hv.winter_year===yr;
+    const survived=hv&&(hv.winter_survived===true&&hv.winter_year===yr);
     if(installEv){
       const days=Math.floor((Date.now()-new Date(installEv.date+"T12:00:00"))/86400000);
       return'<span style="font-size:11px;font-family:sans-serif;padding:2px 8px;border-radius:10px;background:#b0602020;color:#b06020;border:1px solid #b0602050;font-weight:700">📦 New bees '+days+'d ago</span>';
@@ -2138,7 +2139,7 @@ function renderWorkplan(){
     const hv=getHv(t.hv);
     const ap=getAp(t.ap);
     const od2=isOD(t.due);
-    const ctx=hiveContext(hv);
+    const ctx=hiveContext(hv, t.ap);
     let h='<div class="task-row" style="border-left-color:'+(od2?"#b83030":meta.color)+'">';
     h+='<span style="font-size:20px">'+meta.icon+'</span>';
     h+='<div style="flex:1">';
