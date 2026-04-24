@@ -831,11 +831,12 @@ const ET={
   feeding:{icon:"🍯",label:"Feeding",color:"#c17f24"},
   treatment:{icon:"💊",label:"Treatment",color:"#1a6b8a"},
   harvest:{icon:"🫙",label:"Harvest",color:"#7b5ea7"},
-  install:{icon:"📦",label:"Install",color:"#b06020"},
+  add_box:{icon:"📦",label:"Add Box",color:"#3a7d44"},
+  install:{icon:"🐝",label:"Install",color:"#b06020"},
   split:{icon:"✂️",label:"Split",color:"#2060a0"},
   combine:{icon:"🤝",label:"Combine",color:"#5a7a5a"},
   boost:{icon:"💪",label:"Boost Weak Colony",color:"#b87820"},
-  swarm:{icon:"🐝",label:"Swarm",color:"#c0392b"},
+  swarm:{icon:"🌀",label:"Swarm",color:"#c0392b"},
   equipment:{icon:"🔧",label:"Equipment",color:"#606060"},
   note:{icon:"📝",label:"Note",color:"#888888"}
 };
@@ -1662,7 +1663,7 @@ function renderHive(){
   body+='<label style="font-size:12px;font-weight:700;color:#8a9e80;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Feeder</label>';
   body+='<select onchange="setHvField(\''+h.id+'\',\'feeder\',this.value||null)" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #c8bc98;font-size:14px;font-family:sans-serif;background:#fff">';
   body+='<option value="">— None —</option>';
-  [{v:"inner_1gal",l:"🍯 Inner feeder — 1 gal"},{v:"top_2gal",l:"🍯 Top feeder — 2 gal"},{v:"yellow_top_1gal",l:"🟡 Yellow top feeder — 1 gal"},{v:"black_lg_4gal",l:"⬛ Black large feeder — 4 gal"}].forEach(function(f){
+  [{v:"inner_1gal",l:"🍯 Inner feeder — 1 gal"},{v:"top_2gal",l:"🍯 Top feeder — 2 gal"},{v:"yellow_top_1gal",l:"🟡 Yellow top feeder — 1 gal"},{v:"black_lg_4gal",l:"⬛ Black large feeder — 4 gal"},{v:"jar_1",l:"🫙 1 jar"},{v:"jar_2",l:"🫙 2 jars"},{v:"jar_3",l:"🫙 3 jars"}].forEach(function(f){
     body+='<option value="'+f.v+'"'+(feeder===f.v?" selected":"")+'>'+f.l+'</option>';
   });
   body+='</select></div>';
