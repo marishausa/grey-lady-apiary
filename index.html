@@ -1872,9 +1872,41 @@ async function confirmRemoveHive(hiveId,apId){
   if(!h)return;
   const hasEvents=DB.ev.some(function(e){return e.hv===hiveId;});
   const hasTasks=DB.tk.some(function(t){return t.hv===hiveId;});
-  let msg="Remove Hive "+h.n+"?";
-  if(hasEvents||hasTasks)msg+=" This will also delete "+( hasEvents?"event logs":"")+(hasEvents&&hasTasks?" and ":"")+(hasTasks?"tasks":"")+" for this hive.";
-  if(!confirm(msg))return;
+  const ap=getAp(apId);
+
+  // Two-step modal — hard to accidentally confirm
+  var modal=document.createElement("div");
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px";
+  var inner="<div style='background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;font-family:sans-serif'>";
+  inner+="<div style='font-size:32px;text-align:center;margin-bottom:8px'>⚠️</div>";
+  inner+="<div style='font-size:18px;font-weight:800;color:#b83030;text-align:center;margin-bottom:8px'>Delete Hive "+(h.n||"")+"?</div>";
+  inner+="<div style='font-size:14px;color:#444;text-align:center;margin-bottom:6px'>"+(ap?ap.addr:"")+"</div>";
+  if(hasEvents||hasTasks){
+    inner+="<div style='font-size:13px;color:#b83030;background:#fff0f0;border-radius:8px;padding:8px;margin-bottom:12px;text-align:center'>⚠️ Also deletes all "+(hasEvents?"logs":"")+(hasEvents&&hasTasks?" & ":"")+(hasTasks?"tasks":"")+" for this hive</div>";
+  }
+  inner+="<div style='font-size:13px;color:#666;margin-bottom:8px;text-align:center'>Type <strong>DELETE</strong> to confirm:</div>";
+  inner+="<input id='del-confirm-input' type='text' placeholder='Type DELETE here' style='width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:16px;text-align:center;box-sizing:border-box;margin-bottom:12px'>";
+  inner+="<div style='display:flex;gap:8px'>";
+  inner+="<button onclick='document.body.removeChild(this.closest(\".del-modal\"))' style='flex:1;padding:12px;border-radius:10px;border:2px solid #ddd;background:#f5f5f5;font-size:15px;font-weight:700;cursor:pointer'>Cancel</button>";
+  inner+="<button onclick='doDeleteHive(\""+hiveId+"\",\""+apId+"\")' style='flex:1;padding:12px;border-radius:10px;border:none;background:#b83030;color:#fff;font-size:15px;font-weight:700;cursor:pointer'>Delete</button>";
+  inner+="</div></div>";
+  modal.innerHTML=inner;
+  modal.className="del-modal";
+  document.body.appendChild(modal);
+  // Close on backdrop tap
+  modal.addEventListener("click",function(e){if(e.target===modal)document.body.removeChild(modal);});
+}
+
+async function doDeleteHive(hiveId,apId){
+  const input=document.getElementById("del-confirm-input");
+  if(!input||input.value.trim().toUpperCase()!=="DELETE"){
+    input.style.border="2px solid #b83030";
+    input.placeholder="Must type DELETE exactly";
+    return;
+  }
+  // Remove modal
+  const modal=document.querySelector(".del-modal");
+  if(modal)document.body.removeChild(modal);
   // Delete hive and its events/tasks
   await supa.from("events").delete().eq("hive_id",hiveId);
   await supa.from("tasks").delete().eq("hive_id",hiveId);
@@ -1882,11 +1914,10 @@ async function confirmRemoveHive(hiveId,apId){
   DB.hv=DB.hv.filter(function(x){return x.id!==hiveId;});
   DB.ev=DB.ev.filter(function(e){return e.hv!==hiveId;});
   DB.tk=DB.tk.filter(function(t){return t.hv!==hiveId;});
-  // Update apiary hive count
   const remaining=DB.hv.filter(function(h){return h.ap===apId;});
   await supa.from("apiaries").update({hives:remaining.length}).eq("id",apId);
   DB.ap=DB.ap.map(function(a){if(a.id!==apId)return a;return Object.assign({},a,{hives:remaining.length});});
-  toast$("Hive removed");
+  toast$("Hive deleted");
   renderApiary();
 }
 
