@@ -138,7 +138,7 @@ a{text-decoration:none}
 </div>
 
 <div id="s-hosts" class="screen">
-  <div class="hdr"><button class="hdr-back" onclick="goScreen('home')">← Home</button><div class="hdr-title">Hosts</div></div>
+  <div class="hdr"><button class="hdr-back" onclick="goScreen('home')">← Home</button><div class="hdr-title">Hosts</div><button onclick="openNewHostModal()" style="background:#3a7d44;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;padding:7px 14px;cursor:pointer">+ Host</button></div>
   <div class="pads">
     <div class="sec" id="hosts-count"></div>
     <input class="inp" id="host-search" placeholder="🔍 Search address or name…" oninput="renderHosts()" autocomplete="off">
@@ -550,6 +550,30 @@ a{text-decoration:none}
 </div>
 
 <!-- ── HOST UPDATE MODAL ───────────────────────────────────────────────── -->
+<!-- ── NEW HOST MODAL ──────────────────────────────────────────────────── -->
+<div id="new-host-modal" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div class="modal-title">Add New Host(s)</div>
+      <button class="modal-close" onclick="closeModal('new-host-modal')">×</button>
+    </div>
+    <div style="background:#f5f1e8;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-family:sans-serif;font-size:13px;color:#4a6040;line-height:1.6">
+      One address per line. Optionally add: <strong>contact name, hives, phone</strong> separated by commas.<br>
+      <span style="color:#8a9e80">Examples:<br>
+      12 Madaket Rd<br>
+      5 Polpis Rd, Jane Smith<br>
+      8 Alliance Ln, Bob Jones, 2, 508-555-1234</span>
+    </div>
+    <label class="lbl">Addresses</label>
+    <textarea class="textarea" id="nh-bulk" placeholder="12 Madaket Rd&#10;5 Polpis Rd, Jane Smith&#10;8 Alliance Ln, Bob Jones, 2" style="min-height:160px;font-family:monospace;font-size:14px"></textarea>
+    <div id="nh-preview" style="font-family:sans-serif;font-size:13px;color:#4a6040;margin-bottom:10px"></div>
+    <div style="display:flex;gap:10px;padding-bottom:20px;margin-top:4px">
+      <button class="btn-big" style="background:#3a7d44;flex:2;margin-bottom:0" onclick="saveNewHosts()">✓ Add Hosts</button>
+      <button class="btn-sm" style="flex:1" onclick="closeModal('new-host-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="host-modal" class="modal-bg">
   <div class="modal-box" style="max-height:80vh">
     <div class="modal-hdr">
@@ -1339,6 +1363,59 @@ function taskRowHTML(t,showAddr){
 }
 
 // ─── HOSTS ────────────────────────────────────────────────────────────────────
+function openNewHostModal(){
+  document.getElementById("nh-bulk").value="";
+  document.getElementById("nh-preview").textContent="";
+  openModal("new-host-modal");
+}
+
+async function saveNewHosts(){
+  const raw=document.getElementById("nh-bulk").value.trim();
+  if(!raw){toast$("Please enter at least one address",true);return;}
+
+  const lines=raw.split("\n").map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
+  if(lines.length===0){toast$("No valid addresses found",true);return;}
+
+  const hosts=lines.map(function(line){
+    const parts=line.split(",").map(function(p){return p.trim();});
+    return{
+      addr:parts[0]||"",
+      contact:parts[1]||"",
+      hives:parseInt(parts[2])||1,
+      phone:parts[3]||""
+    };
+  }).filter(function(h){return h.addr.length>0;});
+
+  if(hosts.length===0){toast$("No valid addresses found",true);return;}
+
+  let added=0;
+  for(const h of hosts){
+    const apId=crypto.randomUUID();
+    const {error:apErr}=await supa.from("apiaries").insert({
+      id:apId,addr:h.addr,contact:h.contact||null,
+      phone:h.phone||null,hives:h.hives
+    });
+    if(apErr){toast$("Failed: "+h.addr,true);continue;}
+
+    const hiveInserts=[];
+    for(let i=1;i<=h.hives;i++){
+      hiveInserts.push({id:crypto.randomUUID(),apiary_id:apId,num:i,hive_status:"waiting"});
+    }
+    await supa.from("hives").insert(hiveInserts);
+
+    DB.ap.push({id:apId,addr:h.addr,contact:h.contact||"",phone:h.phone||null,notes:null,hives:h.hives,lat:null,lng:null});
+    hiveInserts.forEach(function(hv){
+      DB.hv.push({id:hv.id,ap:apId,n:hv.num,breed:null,queen:"Unknown",str:"Medium",risk:null,notes:"",status:"waiting",winter_survived:null,winter_year:null});
+    });
+    added++;
+  }
+
+  DB.ap.sort(function(a,b){return a.addr.localeCompare(b.addr);});
+  closeModal("new-host-modal");
+  toast$("✓ Added "+added+" host"+(added!==1?"s":""));
+  renderHosts();
+}
+
 function renderHosts(){
   const search=(document.getElementById("host-search")||{value:""}).value.toLowerCase().trim();
   const filtered=DB.ap.filter(function(a){
