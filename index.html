@@ -4460,6 +4460,10 @@ function trapCardHTML(t){
     h+='<button onclick="openSwarmCaughtModal(\''+t.id+'\')" style="flex:2;padding:10px;background:#b87820;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif">🐝 Swarm!</button>';
     h+='<button onclick="setTrapStatus(\''+t.id+'\',\'ready\')" style="padding:10px 12px;background:#eee9db;border:1.5px solid #c8bc98;border-radius:10px;color:#8a9e80;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif">↩ Store</button>';
   }
+  if(t.status==="caught"){
+    h+='<button onclick="redeployTrap(\''+t.id+'\')" style="flex:2;padding:10px;background:#3a7d44;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:sans-serif">🔄 Redeploy</button>';
+    h+='<button onclick="retireTrap(\''+t.id+'\')" style="padding:10px 12px;background:#eee9db;border:1.5px solid #c8bc98;border-radius:10px;color:#8a9e80;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif">🗄 Retire</button>';
+  }
   h+='<button onclick="editTrap(\''+t.id+'\')" style="padding:10px 12px;background:#eee9db;border:1.5px solid #c8bc98;border-radius:10px;color:#4a6040;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif">✏️</button>';
   h+='<button onclick="deleteTrap(\''+t.id+'\')" style="padding:10px 12px;background:#fdecea;border:1.5px solid rgba(184,48,48,.3);border-radius:10px;color:#b83030;font-size:13px;font-weight:700;cursor:pointer;font-family:sans-serif">🗑</button>';
   if(t.lat&&t.lng){
@@ -4548,6 +4552,14 @@ async function retireTrap(id){
   await SB.updateTrap(id,{status:"retired"});
   DB.tr=DB.tr.map(function(t){if(t.id!==id)return t;return Object.assign({},t,{status:"retired"});});
   toast$("Trap retired");
+  renderTraps();
+}
+
+async function redeployTrap(id){
+  var fields={status:"active",last_checked:null,swarm_size:null,destination:null};
+  await SB.updateTrap(id,fields);
+  DB.tr=DB.tr.map(function(t){if(t.id!==id)return t;return Object.assign({},t,fields);});
+  toast$("Trap redeployed 🔄");
   renderTraps();
 }
 
