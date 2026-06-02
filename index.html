@@ -4379,6 +4379,8 @@ function trapCardHTML(t){
   const statusColors={ready:"#8a9e80",active:"#3a7d44",caught:"#b87820",retired:"#aaaaaa"};
   const statusLabels={ready:"📦 Ready",active:"🪤 Deployed",caught:"🐝 Swarm Caught!",retired:"Retired"};
   const col=statusColors[t.status]||"#3a7d44";
+  var catches=getTrapCatches(t.id,t.label,t.location);
+  var catchCount=catches.length;
 
   let h='<div class="card" style="border-left:4px solid '+col+';margin-bottom:12px">';
   h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
