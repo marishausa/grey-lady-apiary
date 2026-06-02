@@ -4360,6 +4360,17 @@ function renderTraps(){
   document.getElementById("traps-body").innerHTML=html;
 }
 
+function getTrapCatches(trapId,trapLabel,trapLocation){
+  // Match by trap_id (new events) or by "From trap: NAME" pattern in notes (legacy)
+  var name=trapLabel||trapLocation||"";
+  return DB.ev.filter(function(e){
+    if(e.type!=="swarm"||e.swarm_type!=="caught")return false;
+    if(e.trap_id&&e.trap_id===trapId)return true;
+    if(!e.trap_id&&name&&e.notes&&e.notes.indexOf("From trap: "+name)===0)return true;
+    return false;
+  }).sort(function(a,b){return b.date.localeCompare(a.date);});
+}
+
 function trapCardHTML(t){
   const last=t.last_checked||t.date_set;
   const daysSince=last?Math.floor((Date.now()-new Date(last+"T12:00:00"))/86400000):null;
@@ -4381,7 +4392,10 @@ function trapCardHTML(t){
   }
   if(t.nearest_addr)h+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif">📍 '+escHtml(t.nearest_addr)+'</div>';
   h+='</div>';
+  h+='<div style="display:flex;align-items:center;gap:6px">';
   h+='<span class="pill" style="background:'+col+'20;border:1.5px solid '+col+'50;color:'+col+'">'+statusLabels[t.status||"active"]+'</span>';
+  if(catchCount>0)h+='<span style="background:#b8782020;border:1.5px solid #b8782050;color:#b87820;font-size:12px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap">🐝 '+catchCount+'×</span>';
+  h+='</div>';
   h+='</div>';
 
   // Details — bait box only, show lure and date
@@ -4409,6 +4423,31 @@ function trapCardHTML(t){
   if(t.swarm_size)h+='<div style="font-size:14px;font-family:sans-serif;color:#4a6040;margin-bottom:6px">🐝 Swarm size: <strong>'+t.swarm_size+'</strong></div>';
   if(t.destination)h+='<div style="font-size:14px;font-family:sans-serif;color:#4a6040;margin-bottom:6px">→ '+escHtml(t.destination)+'</div>';
   if(t.notes)h+='<div style="font-size:13px;color:#8a9e80;font-family:sans-serif;margin-bottom:8px">'+escHtml(t.notes)+'</div>';
+  // Catch history — show for all statuses if there are past catches
+  if(catchCount>0){
+    var showAll=catchCount<=3;
+    var displayCatches=showAll?catches:catches.slice(0,3);
+    h+='<div style="background:#fdf8f0;border:1px solid #e8dcc8;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-family:sans-serif">';
+    h+='<div style="font-size:12px;font-weight:700;color:#b87820;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🐝 Catch History ('+catchCount+')</div>';
+    displayCatches.forEach(function(ev,i){
+      var sz=ev.swarm_size?ev.swarm_size:"?";
+      var dest=ev.swarm_dest||"";
+      // strip "From trap: NAME — " prefix from notes to get user note
+      var userNote="";
+      if(ev.notes){
+        var dashIdx=ev.notes.indexOf(" — ");
+        if(dashIdx>-1)userNote=ev.notes.slice(dashIdx+3);
+      }
+      h+='<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;border-top:'+( i>0?"1px solid #e8dcc8":"none" )+'">'
+        +'<span style="color:#8a9e80;font-size:12px;min-width:72px">'+fmtD(ev.date)+'</span>'
+        +'<span style="font-size:13px;color:#4a6040;font-weight:600">'+escHtml(sz)+'</span>'
+        +(dest?'<span style="font-size:12px;color:#8a9e80;flex:1">→ '+escHtml(dest)+'</span>':"")
+        +(userNote?'<span style="font-size:11px;color:#aaa;font-style:italic">'+escHtml(userNote)+'</span>':"")
+        +'</div>';
+    });
+    if(!showAll)h+='<div style="font-size:11px;color:#aaa;padding-top:4px;border-top:1px solid #e8dcc8">+' +(catchCount-3)+' more</div>';
+    h+='</div>';
+  }
 
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
   if(t.status==="ready"){
@@ -4644,6 +4683,8 @@ async function saveSwarmCaught(){
     id:uid(), ap:apId||null, hv:hvId||null,
     date:today(), type:"swarm",
     swarm_type:"caught", swarm_dest:destText,
+    swarm_size:size||null,
+    trap_id:caughtTrapId||null,
     notes:"From trap: "+(trap?trap.label||trap.location:"")+(notes?" — "+notes:"")
   };
   await SB.addEvent(swarmEv);
