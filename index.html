@@ -332,6 +332,30 @@ a{text-decoration:none}
     </div>
   </div>
 </div>
+<!-- ── EDIT CATCH MODAL ──────────────────────────────────────────────── -->
+<div id="edit-catch-modal" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div class="modal-title">✏️ Edit Catch</div>
+      <button class="modal-close" onclick="closeModal('edit-catch-modal')">×</button>
+    </div>
+    <label class="lbl">Swarm Size</label>
+    <select class="sel" id="edit-catch-size">
+      <option value="small">Small (baseball sized)</option>
+      <option value="medium">Medium (football sized)</option>
+      <option value="large">Large (basketball sized)</option>
+      <option value="very_large">Very large (multiple clusters)</option>
+    </select>
+    <label class="lbl">Destination</label>
+    <input class="inp" id="edit-catch-dest" placeholder="e.g. New hive at 21 Quidnet">
+    <label class="lbl">Notes</label>
+    <textarea class="textarea" id="edit-catch-notes" placeholder="Queen spotted? Virgin or mated? Color?" rows="3"></textarea>
+    <div style="display:flex;gap:10px;padding-bottom:20px;margin-top:12px">
+      <button class="btn-big" style="background:#3a7d44;flex:2;margin-bottom:0" onclick="saveEditCatch()">✓ Save</button>
+      <button class="btn-sm" style="flex:1" onclick="closeModal('edit-catch-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
 <nav class="nav" id="main-nav">
   <button class="nav-btn active" data-s="home" onclick="goScreen('home')"><span class="nav-icon">🏠</span><span class="nav-lbl">Home</span></button>
   <button class="nav-btn" data-s="voice" onclick="goScreen('voice')"><span class="nav-icon">🎤</span><span class="nav-lbl">Record</span></button>
@@ -681,6 +705,8 @@ const SB = {
     if(ev.jars_date)row.jars_date=ev.jars_date;
     if(ev.swarm_type)row.swarm_type=ev.swarm_type;
     if(ev.swarm_dest)row.swarm_dest=ev.swarm_dest;
+    if(ev.swarm_size)row.swarm_size=ev.swarm_size;
+    if(ev.trap_id)row.trap_id=ev.trap_id;
     // Offline: queue write
     if(!isOnline){await queueWrite({type:"addEvent",data:row});updateSyncBanner();return true;}
     const {error} = await supa.from('events').insert(row);
@@ -688,6 +714,20 @@ const SB = {
       console.error('addEvent error:', error.message, error.details, error.hint);
       alert('Save error: ' + error.message + '\n' + (error.details||''));
     }
+    return !error;
+  },
+
+  async deleteEvent(id) {
+    if(!isOnline){await queueWrite({type:"deleteEvent",data:{id}});updateSyncBanner();return true;}
+    const {error} = await supa.from('events').delete().eq('id',id);
+    if(error)console.error('deleteEvent error:',error.message);
+    return !error;
+  },
+
+  async updateEvent(id, fields) {
+    if(!isOnline){await queueWrite({type:"updateEvent",data:{id,fields}});updateSyncBanner();return true;}
+    const {error} = await supa.from('events').update(fields).eq('id',id);
+    if(error)console.error('updateEvent error:',error.message);
     return !error;
   },
 
@@ -973,6 +1013,10 @@ async function syncPendingWrites(){
       else if(op.type==="updateHive")ok=await SB.updateHive(op.data.id,op.data.fields);
       else if(op.type==="deleteEvent"){
         const{error}=await supa.from("events").delete().eq("id",op.data.id);
+        ok=!error;
+      }
+      else if(op.type==="updateEvent"){
+        const{error}=await supa.from("events").update(op.data.fields).eq("id",op.data.id);
         ok=!error;
       }
       if(ok)await clearQueueItem(op.id);
@@ -4445,11 +4489,13 @@ function trapCardHTML(t){
         var dashIdx=ev.notes.indexOf(" — ");
         if(dashIdx>-1)userNote=ev.notes.slice(dashIdx+3);
       }
-      h+='<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;border-top:'+( i>0?"1px solid #e8dcc8":"none" )+'">'
+      h+='<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-top:'+( i>0?"1px solid #e8dcc8":"none" )+'">'
         +'<span style="color:#8a9e80;font-size:12px;min-width:72px">'+fmtD(ev.date)+'</span>'
         +'<span style="font-size:13px;color:#4a6040;font-weight:600">'+escHtml(sz)+'</span>'
-        +(dest?'<span style="font-size:12px;color:#8a9e80;flex:1">→ '+escHtml(dest)+'</span>':"")
+        +(dest?'<span style="font-size:12px;color:#8a9e80;flex:1">→ '+escHtml(dest)+'</span>':"<span style=\"flex:1\"></span>")
         +(userNote?'<span style="font-size:11px;color:#aaa;font-style:italic">'+escHtml(userNote)+'</span>':"")
+        +'<button onclick="openEditCatch(\''+ev.id+'\')" style="padding:2px 7px;background:#eee9db;border:1px solid #c8bc98;border-radius:6px;color:#4a6040;font-size:11px;cursor:pointer;font-family:sans-serif;flex-shrink:0">✏️</button>'
+        +'<button onclick="deleteCatchEvent(\''+ev.id+'\')" style="padding:2px 7px;background:#fdecea;border:1px solid rgba(184,48,48,.3);border-radius:6px;color:#b83030;font-size:11px;cursor:pointer;font-family:sans-serif;flex-shrink:0">✕</button>'
         +'</div>';
     });
     if(!showAll)h+='<div style="font-size:11px;color:#aaa;padding-top:4px;border-top:1px solid #e8dcc8">+' +(catchCount-3)+' more</div>';
@@ -4557,6 +4603,50 @@ async function retireTrap(id){
   await SB.updateTrap(id,{status:"retired"});
   DB.tr=DB.tr.map(function(t){if(t.id!==id)return t;return Object.assign({},t,{status:"retired"});});
   toast$("Trap retired");
+  renderTraps();
+}
+
+var _editCatchId=null;
+function openEditCatch(evId){
+  var ev=DB.ev.find(function(e){return e.id===evId;});
+  if(!ev)return;
+  _editCatchId=evId;
+  document.getElementById("edit-catch-size").value=ev.swarm_size||"medium";
+  document.getElementById("edit-catch-dest").value=ev.swarm_dest||"";
+  // show only user note portion (strip "From trap: NAME — " prefix)
+  var note=ev.notes||"";
+  var dashIdx=note.indexOf(" — ");
+  document.getElementById("edit-catch-notes").value=dashIdx>-1?note.slice(dashIdx+3):"";
+  openModal("edit-catch-modal");
+}
+
+async function saveEditCatch(){
+  if(!_editCatchId)return;
+  var ev=DB.ev.find(function(e){return e.id===_editCatchId;});
+  if(!ev)return;
+  var size=document.getElementById("edit-catch-size").value;
+  var dest=document.getElementById("edit-catch-dest").value.trim();
+  var userNote=document.getElementById("edit-catch-notes").value.trim();
+  // Reconstruct notes preserving the "From trap: NAME" prefix
+  var baseNote=ev.notes||"";
+  var dashIdx=baseNote.indexOf(" — ");
+  var prefix=dashIdx>-1?baseNote.slice(0,dashIdx):baseNote;
+  var newNotes=userNote?(prefix+" — "+userNote):prefix;
+  var fields={swarm_size:size,swarm_dest:dest,notes:newNotes};
+  var ok=await SB.updateEvent(_editCatchId,fields);
+  if(ok){
+    DB.ev=DB.ev.map(function(e){return e.id!==_editCatchId?e:Object.assign({},e,fields);});
+    toast$("Catch updated ✓");
+    closeModal("edit-catch-modal");
+    renderTraps();
+  }
+}
+
+async function deleteCatchEvent(evId){
+  if(!confirm("Remove this catch entry?"))return;
+  await SB.deleteEvent(evId);
+  DB.ev=DB.ev.filter(function(e){return e.id!==evId;});
+  toast$("Catch entry removed");
   renderTraps();
 }
 
