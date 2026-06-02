@@ -4308,6 +4308,7 @@ function renderTraps(){
   const active=DB.tr.filter(function(t){return t.status==="active";});
   const caught=DB.tr.filter(function(t){return t.status==="caught";});
   const retired=DB.tr.filter(function(t){return t.status==="retired";});
+  const totalCaught=DB.ev.filter(function(e){return e.type==="swarm"&&e.swarm_type==="caught";}).length;
   const overdue=active.filter(function(t){
     if(!t.last_checked&&!t.date_set)return false;
     const last=new Date((t.last_checked||t.date_set)+"T12:00:00");
@@ -4317,12 +4318,16 @@ function renderTraps(){
 
   let html='';
 
-  // Summary stats
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px">';
+  // Summary stats — row 1: trap status
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
   html+=scCard("📦",ready.length,"Ready","#8a9e80");
   html+=scCard("🪤",active.length,"Deployed","#3a7d44");
   html+=scCard("⚠️",overdue.length,"Check Now","#b83030");
-  html+=scCard("🐝",caught.length,"Caught","#b87820");
+  html+='</div>';
+  // Summary stats — row 2: catch totals
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">';
+  html+=scCard("🐝",caught.length,"Awaiting Action","#b87820");
+  html+=scCard("🏆",totalCaught,"Total Caught","#3a7d44");
   html+='</div>';
 
   if(overdue.length>0){
