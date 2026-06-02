@@ -4621,24 +4621,32 @@ function openEditCatch(evId){
 }
 
 async function saveEditCatch(){
-  if(!_editCatchId)return;
-  var ev=DB.ev.find(function(e){return e.id===_editCatchId;});
-  if(!ev)return;
-  var size=document.getElementById("edit-catch-size").value;
-  var dest=document.getElementById("edit-catch-dest").value.trim();
-  var userNote=document.getElementById("edit-catch-notes").value.trim();
-  // Reconstruct notes preserving the "From trap: NAME" prefix
-  var baseNote=ev.notes||"";
-  var dashIdx=baseNote.indexOf(" — ");
-  var prefix=dashIdx>-1?baseNote.slice(0,dashIdx):baseNote;
-  var newNotes=userNote?(prefix+" — "+userNote):prefix;
-  var fields={swarm_size:size,swarm_dest:dest,notes:newNotes};
-  var ok=await SB.updateEvent(_editCatchId,fields);
-  if(ok){
-    DB.ev=DB.ev.map(function(e){return e.id!==_editCatchId?e:Object.assign({},e,fields);});
-    toast$("Catch updated ✓");
+  try{
+    if(!_editCatchId){console.warn("saveEditCatch: no _editCatchId");return;}
+    var ev=DB.ev.find(function(e){return e.id===_editCatchId;});
+    if(!ev){console.warn("saveEditCatch: event not found",_editCatchId);return;}
+    var size=document.getElementById("edit-catch-size").value;
+    var dest=document.getElementById("edit-catch-dest").value.trim();
+    var userNote=document.getElementById("edit-catch-notes").value.trim();
+    // Reconstruct notes preserving the "From trap: NAME" prefix
+    var baseNote=ev.notes||"";
+    var dashIdx=baseNote.indexOf(" — ");
+    var prefix=dashIdx>-1?baseNote.slice(0,dashIdx):baseNote;
+    var newNotes=userNote?(prefix+" — "+userNote):prefix;
+    // Only update notes and swarm_dest — avoid swarm_size column if it may not exist
+    var fields={swarm_dest:dest,notes:newNotes};
+    // Update local DB immediately so UI reflects change even if save has issues
+    DB.ev=DB.ev.map(function(e){return e.id!==_editCatchId?e:Object.assign({},e,{swarm_size:size,swarm_dest:dest,notes:newNotes});});
     closeModal("edit-catch-modal");
     renderTraps();
+    toast$("Catch updated ✓");
+    // Save to Supabase in background
+    SB.updateEvent(_editCatchId,fields).then(function(ok){
+      if(!ok)toast$("Sync error — change saved locally",true);
+    }).catch(function(e){console.error("saveEditCatch error:",e);});
+  }catch(e){
+    console.error("saveEditCatch exception:",e);
+    toast$("Error saving: "+e.message,true);
   }
 }
 
