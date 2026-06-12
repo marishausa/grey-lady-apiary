@@ -1464,7 +1464,7 @@ function renderHosts(){
   const search=(document.getElementById("host-search")||{value:""}).value.toLowerCase().trim();
   const filtered=DB.ap.filter(function(a){
     if(!search)return true;
-    return a.addr.toLowerCase().includes(search)||a.contact.toLowerCase().includes(search);
+    return (a.addr||"").toLowerCase().includes(search)||(a.contact||"").toLowerCase().includes(search);
   });
   document.getElementById("hosts-count").textContent=filtered.length+" of "+DB.ap.length+" locations";
   let html="";
