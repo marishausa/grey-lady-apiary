@@ -914,7 +914,7 @@ function mapHv(row){return{id:row.id,ap:row.apiary_id,n:row.num,label:row.label|
 function mapEv(row){
   // Normalize date — Supabase may return full timestamp, extract just YYYY-MM-DD
   var d=row.date?String(row.date).slice(0,10):null;
-  return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:d,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,capped_brood:row.capped_brood,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,equip_type:row.equip_type,equip_action:row.equip_action};
+  return{id:row.id,ap:row.apiary_id,hv:row.hive_id,type:row.type,date:d,notes:row.notes,ts:row.created_at,queen_seen:row.queen_seen,eggs_seen:row.eggs_seen,queen_cells:row.queen_cells,capped_brood:row.capped_brood,str:row.strength,brood:row.brood,boxes_added:row.boxes_added,frames_added:row.frames_added,problems:row.problems,feed_type:row.feed_type,amt:row.amount,treat_type:row.treat_type,dur:row.duration,lbs:row.lbs,frames:row.frames,frames_comb:row.frames_comb,box_type:row.box_type,jars:row.jars,jar_size:row.jar_size,jars_date:row.jars_date,breed:row.breed,source:row.source,swarm_type:row.swarm_type,swarm_dest:row.swarm_dest,swarm_size:row.swarm_size,trap_id:row.trap_id,equip_type:row.equip_type,equip_action:row.equip_action};
 }
 
 function mapTk(row){return{id:row.id,ap:row.apiary_id,hv:row.hive_id,ttype:row.task_type,notes:row.notes,due:row.due_date,status:row.status,ts:row.created_at};}
@@ -4360,12 +4360,15 @@ async function quickWinter(hid,survived){
 }
 let editingTrapId = null;
 
+var trapFilter="all";
+function setTrapFilter(f){trapFilter=(trapFilter===f?"all":f);renderTraps();}
+
 function renderTraps(){
   const ready=DB.tr.filter(function(t){return t.status==="ready";});
   const active=DB.tr.filter(function(t){return t.status==="active";});
   const caught=DB.tr.filter(function(t){return t.status==="caught";});
   const retired=DB.tr.filter(function(t){return t.status==="retired";});
-  const totalCaught=DB.ev.filter(function(e){return e.type==="swarm"&&e.swarm_type==="caught";}).length;
+  const totalCaught=DB.ev.filter(isTrapCatchEvent).length;
   const overdue=active.filter(function(t){
     if(!t.last_checked&&!t.date_set)return false;
     const last=new Date((t.last_checked||t.date_set)+"T12:00:00");
@@ -4375,16 +4378,23 @@ function renderTraps(){
 
   let html='';
 
-  // Summary stats — row 1: trap status
+  function fCard(icon,val,label,color,f){
+    var isActive=trapFilter===f;
+    var outline=isActive?"outline:2px solid "+color+";outline-offset:-2px;background:"+color+"18":"";
+    return '<div class="sc-card" onclick="setTrapFilter(\''+f+'\')" style="cursor:pointer;'+outline+'">'
+      +'<div style="font-size:22px">'+icon+'</div>'
+      +'<div style="font-size:28px;font-weight:800;color:'+color+';font-family:sans-serif">'+val+'</div>'
+      +'<div style="font-size:11px;color:#4a6040;font-family:sans-serif;text-transform:uppercase;letter-spacing:.07em;margin-top:2px">'+label+'</div>'
+      +'</div>';
+  }
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
-  html+=scCard("📦",ready.length,"Ready","#8a9e80");
-  html+=scCard("🪤",active.length,"Deployed","#3a7d44");
-  html+=scCard("⚠️",overdue.length,"Check Now","#b83030");
+  html+=fCard("📦",ready.length,"Ready","#8a9e80","ready");
+  html+=fCard("🪤",active.length,"Deployed","#3a7d44","active");
+  html+=fCard("⚠️",overdue.length,"Check Now","#b83030","overdue");
   html+='</div>';
-  // Summary stats — row 2: catch totals
   html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">';
-  html+=scCard("🐝",caught.length,"Awaiting Action","#b87820");
-  html+=scCard("🏆",totalCaught,"Total Caught","#3a7d44");
+  html+=fCard("🐝",caught.length,"Awaiting Action","#b87820","caught");
+  html+=fCard("🏆",totalCaught,"Total Caught","#3a7d44","history");
   html+='</div>';
 
   if(overdue.length>0){
@@ -4402,35 +4412,68 @@ function renderTraps(){
     html+='</div>';
   }
 
-  if(ready.length>0){
-    html+='<div class="sec">Ready for Season ('+ready.length+')</div>';
-    ready.forEach(function(t){ html+=trapCardHTML(t); });
-  }
-  if(active.length>0){
-    html+='<div class="sec">Deployed in Field ('+active.length+')</div>';
-    active.forEach(function(t){ html+=trapCardHTML(t); });
-  }
-  if(caught.length>0){
-    html+='<div class="sec" style="margin-top:8px">Swarms Caught ('+caught.length+')</div>';
-    caught.forEach(function(t){ html+=trapCardHTML(t); });
-  }
-  if(retired.length>0){
-    html+='<div class="sec" style="margin-top:8px">Retired ('+retired.length+')</div>';
-    retired.forEach(function(t){ html+=trapCardHTML(t); });
+  // Apply filter
+  var showReady=trapFilter==="all"||trapFilter==="ready";
+  var showActive=trapFilter==="all"||trapFilter==="active"||trapFilter==="overdue";
+  var showCaught=trapFilter==="all"||trapFilter==="caught";
+  var showHistory=trapFilter==="history";
+  var showRetired=trapFilter==="all";
+  var displayActive=trapFilter==="overdue"?overdue:active;
+
+  if(trapFilter==="history"){
+    // Show all traps that have at least one catch
+    html+='<div class="sec">Catch History — All Traps</div>';
+    var trapsWithHistory=DB.tr.filter(function(t){return getTrapCatches(t.id,t.label,t.location).length>0;});
+    if(trapsWithHistory.length===0)html+='<div class="card" style="text-align:center;padding:24px;color:#8a9e80;font-family:sans-serif">No catches recorded yet</div>';
+    trapsWithHistory.forEach(function(t){ html+=trapCardHTML(t); });
+  } else {
+    if(showReady&&ready.length>0){
+      html+='<div class="sec">Ready for Season ('+ready.length+')</div>';
+      ready.forEach(function(t){ html+=trapCardHTML(t); });
+    }
+    if(showActive&&displayActive.length>0){
+      var label=trapFilter==="overdue"?"Overdue for Check ("+overdue.length+")":"Deployed in Field ("+active.length+")";
+      html+='<div class="sec">'+label+'</div>';
+      displayActive.forEach(function(t){ html+=trapCardHTML(t); });
+    }
+    if(showCaught&&caught.length>0){
+      html+='<div class="sec" style="margin-top:8px">Swarms Caught ('+caught.length+')</div>';
+      caught.forEach(function(t){ html+=trapCardHTML(t); });
+    }
+    if(showRetired&&retired.length>0){
+      html+='<div class="sec" style="margin-top:8px">Retired ('+retired.length+')</div>';
+      retired.forEach(function(t){ html+=trapCardHTML(t); });
+    }
   }
 
   document.getElementById("traps-body").innerHTML=html;
 }
 
+function isTrapCatchEvent(e){
+  if(e.type!=="swarm")return false;
+  if(e.swarm_type==="caught")return true;
+  // Legacy: swarm events logged via trap before swarm_type was set
+  if(e.notes&&e.notes.indexOf("From trap: ")===0)return true;
+  return false;
+}
+
 function getTrapCatches(trapId,trapLabel,trapLocation){
-  // Match by trap_id (new events) or by "From trap: NAME" pattern in notes (legacy)
   var name=trapLabel||trapLocation||"";
   return DB.ev.filter(function(e){
-    if(e.type!=="swarm"||e.swarm_type!=="caught")return false;
+    if(!isTrapCatchEvent(e))return false;
     if(e.trap_id&&e.trap_id===trapId)return true;
-    if(!e.trap_id&&name&&e.notes&&e.notes.indexOf("From trap: "+name)===0)return true;
+    if(!e.trap_id&&name&&e.notes){
+      // match "From trap: LABEL" or "From trap: LOCATION"
+      if(e.notes.indexOf("From trap: "+name)===0)return true;
+      // also match if notes contains the name anywhere after "From trap: "
+      var fromIdx=e.notes.indexOf("From trap: ");
+      if(fromIdx===0){
+        var trapName=e.notes.slice(11).split(" — ")[0].trim();
+        if(trapName===name)return true;
+      }
+    }
     return false;
-  }).sort(function(a,b){return b.date.localeCompare(a.date);});
+  }).sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
 }
 
 function trapCardHTML(t){
