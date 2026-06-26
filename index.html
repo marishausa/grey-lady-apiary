@@ -248,6 +248,9 @@ a{text-decoration:none}
     </div>
     <button onclick="openAddTrapModal()" style="background:#3a5c3a;border:2px solid #7ab87a;border-radius:10px;padding:10px 14px;color:#c8f0c8;font-size:15px;font-family:sans-serif;font-weight:700;cursor:pointer">+ Add Trap</button>
   </div>
+  <div style="padding:10px 16px 0">
+    <input class="inp" id="trap-search" placeholder="🔍 Search address or location…" oninput="renderTraps()" autocomplete="off" style="margin-bottom:0">
+  </div>
   <div class="pads" id="traps-body"></div>
 </div>
 
@@ -4364,10 +4367,18 @@ var trapFilter="all";
 function setTrapFilter(f){trapFilter=(trapFilter===f?"all":f);renderTraps();}
 
 function renderTraps(){
-  const ready=DB.tr.filter(function(t){return t.status==="ready";});
-  const active=DB.tr.filter(function(t){return t.status==="active";});
-  const caught=DB.tr.filter(function(t){return t.status==="caught";});
-  const retired=DB.tr.filter(function(t){return t.status==="retired";});
+  var trapSearch=(document.getElementById("trap-search")||{value:""}).value.toLowerCase().trim();
+  function trapMatchesSearch(t){
+    if(!trapSearch)return true;
+    return (t.label||"").toLowerCase().includes(trapSearch)
+        ||(t.location||"").toLowerCase().includes(trapSearch)
+        ||(t.nearest_addr||"").toLowerCase().includes(trapSearch);
+  }
+  var allTraps=trapSearch?DB.tr.filter(trapMatchesSearch):DB.tr;
+  const ready=allTraps.filter(function(t){return t.status==="ready";});
+  const active=allTraps.filter(function(t){return t.status==="active";});
+  const caught=allTraps.filter(function(t){return t.status==="caught";});
+  const retired=allTraps.filter(function(t){return t.status==="retired";});
   const totalCaught=DB.ev.filter(isTrapCatchEvent).length;
   const overdue=active.filter(function(t){
     if(!t.last_checked&&!t.date_set)return false;
@@ -4406,9 +4417,15 @@ function renderTraps(){
 
   if(ready.length===0&&active.length===0&&caught.length===0){
     html+='<div class="card" style="text-align:center;padding:32px 16px">';
-    html+='<div style="font-size:40px;margin-bottom:10px">🪤</div>';
-    html+='<div style="font-size:18px;font-weight:700;margin-bottom:6px">No traps yet</div>';
-    html+='<div style="font-size:15px;color:#4a6040;font-family:sans-serif">Tap + Add Trap to register your bait boxes</div>';
+    if(trapSearch){
+      html+='<div style="font-size:32px;margin-bottom:10px">🔍</div>';
+      html+='<div style="font-size:17px;font-weight:700;margin-bottom:6px">No traps found</div>';
+      html+='<div style="font-size:14px;color:#8a9e80;font-family:sans-serif">No traps match "'+escHtml(trapSearch)+'"</div>';
+    } else {
+      html+='<div style="font-size:40px;margin-bottom:10px">🪤</div>';
+      html+='<div style="font-size:18px;font-weight:700;margin-bottom:6px">No traps yet</div>';
+      html+='<div style="font-size:15px;color:#4a6040;font-family:sans-serif">Tap + Add Trap to register your bait boxes</div>';
+    }
     html+='</div>';
   }
 
